@@ -1677,6 +1677,9 @@ export abstract class Strategy implements StrategyInterface {
           }
         }
       }
+      if (total) {
+        this.updateStats(d.profit.total, total)
+      }
     }
     return d
   }
@@ -2094,94 +2097,41 @@ export abstract class Strategy implements StrategyInterface {
     return { ...minigrid, status: 'close' }
   }
 
-  private closeDeal(
-    d: Deal,
-    b: Bar,
-    tpOrder?: FullGrid,
-    cbClose?: (price: number) => void,
-    liquidationPrice?: number,
-  ) {
-    let closePrice = b.close
-    let profit: ReturnType<typeof this.getProfit> | undefined
-    d.status = 'closed'
-    d.closedTime = b.time
-    d.ordersHistory = d.ordersHistory.map((o) =>
-      o.filledTime ? { ...o } : { ...o, filledTime: b.time },
-    )
-    d.duration = d.closedTime - d.startTime
-    d.splitDuration = friendlyTime(d.duration)
-    d.mingrids = d.mingrids.map((m) => this.closeMinigrid(m))
-    d.liquidationPrice = liquidationPrice
-    if (tpOrder) {
-      const { price } = tpOrder
-      closePrice = price
-      d.closePrice = price
-      d.filledOrders = [
-        ...d.filledOrders.filter((fo) => fo.id !== tpOrder.id),
-        { ...tpOrder, filledTime: b.time },
-      ].map((o) => ({ ...o, dealId: d.id }))
-
-      const _profit = this.getProfit(d, b.time)
-      if (_profit) {
-        d.profit = _profit
-        profit = d.profit
-      }
-    } else {
-      d.profit.perc = this.math.round(
-        (d.profit.total /
-          (this.futures
-            ? this.coinm
-              ? d.usage.max.base * d.startPrice
-              : d.usage.max.quote
-            : this.long
-            ? d.usage.max.quote
-            : d.usage.max.base * d.startPrice)) *
-          100,
-        2,
-      )
-      d.profit.total = this.math.round(d.profit.total, this.precision + 3)
-      d.profit.totalUsd = this.math.round(d.profit.totalUsd, 2)
-      profit = d.profit
-    }
-
+  private updateStats(profit?: number, totalDiffProfit?: number) {
     if (profit) {
-      this.balance += profit.total
-      if (profit.total > 0 && profit.total > Strategy.maxProfit) {
-        Strategy.maxProfit = profit.total
+      this.balance += this.combo ? totalDiffProfit ?? profit ?? 0 : profit ?? 0
+      if (profit > 0 && profit > Strategy.maxProfit) {
+        Strategy.maxProfit = profit
       }
-      if (profit.total < 0 && profit.total < Strategy.maxLoss) {
-        Strategy.maxLoss = profit.total
+      if (profit < 0 && profit < Strategy.maxLoss) {
+        Strategy.maxLoss = profit
       }
-      if (!Strategy.previousDeal && profit.total > 0) {
-        Strategy.maxConsecutiveWins = 1
+      if (
+        (this.combo
+          ? !(Strategy.previousDeal || Strategy.seriesLoss.value)
+          : !Strategy.previousDeal) &&
+        profit > 0
+      ) {
         Strategy.seriesWin.value = this.balance - this.initialBalance
         Strategy.seriesWin.min = this.initialBalance
         Strategy.seriesWin.max = this.balance
-        Strategy.seriesWin.perc = profit.total / this.balance
+        Strategy.seriesWin.perc = profit / this.balance
       }
-      if (!Strategy.previousDeal && profit.total < 0) {
-        Strategy.maxConsecutiveLosses = 1
+      if (
+        (this.combo
+          ? !(Strategy.previousDeal || Strategy.seriesWin.value)
+          : !Strategy.previousDeal) &&
+        profit < 0
+      ) {
         Strategy.seriesLoss.value = this.initialBalance - this.balance
         Strategy.seriesLoss.min = this.balance
         Strategy.seriesLoss.max = this.initialBalance
-        Strategy.seriesLoss.perc = profit.total / this.balance
+        Strategy.seriesLoss.perc = profit / this.balance
       }
-      if (profit.total > 0) {
-        if (Strategy.previousDeal && Strategy.previousDeal.profit.total < 0) {
-          Strategy.seriesWin.count = 0
-          Strategy.seriesLoss.count = 0
-        }
-        Strategy.seriesWin.count += 1
-      }
-      if (profit.total < 0) {
-        if (Strategy.previousDeal && Strategy.previousDeal.profit.total > 0) {
-          Strategy.seriesWin.count = 0
-          Strategy.seriesLoss.count = 0
-        }
-        Strategy.seriesLoss.count += 1
-      }
-      Strategy.totalProfit += profit.total
+
+      Strategy.totalProfit += this.combo ? totalDiffProfit ?? 0 : profit ?? 0
     }
+
     if (this.balance > Strategy.seriesWin.max) {
       Strategy.seriesWin.max = this.balance
       if (Strategy.seriesWin.min === 0) {
@@ -2218,6 +2168,89 @@ export abstract class Strategy implements StrategyInterface {
       Strategy.seriesLoss.max = this.balance
       Strategy.seriesLoss.min = this.balance
     }
+    console.log(
+      this.balance,
+      profit,
+      totalDiffProfit,
+      { ...Strategy.seriesLoss },
+      { ...Strategy.seriesWin },
+    )
+  }
+
+  private closeDeal(
+    d: Deal,
+    b: Bar,
+    tpOrder?: FullGrid,
+    cbClose?: (price: number) => void,
+    liquidationPrice?: number,
+  ) {
+    let closePrice = b.close
+    let profit: ReturnType<typeof this.getProfit> | undefined
+    let totalDiffProfit = 0
+    d.status = 'closed'
+    d.closedTime = b.time
+    d.ordersHistory = d.ordersHistory.map((o) =>
+      o.filledTime ? { ...o } : { ...o, filledTime: b.time },
+    )
+    d.duration = d.closedTime - d.startTime
+    d.splitDuration = friendlyTime(d.duration)
+    d.mingrids = d.mingrids.map((m) => this.closeMinigrid(m))
+    d.liquidationPrice = liquidationPrice
+    if (tpOrder) {
+      const { price } = tpOrder
+      closePrice = price
+      d.closePrice = price
+      d.filledOrders = [
+        ...d.filledOrders.filter((fo) => fo.id !== tpOrder.id),
+        { ...tpOrder, filledTime: b.time },
+      ].map((o) => ({ ...o, dealId: d.id }))
+
+      const _profit = this.getProfit(d, b.time)
+      if (_profit) {
+        if (this.combo) {
+          totalDiffProfit = _profit.total - d.profit.total
+        }
+        d.profit = _profit
+        profit = d.profit
+      }
+    } else {
+      d.profit.perc = this.math.round(
+        (d.profit.total /
+          (this.futures
+            ? this.coinm
+              ? d.usage.max.base * d.startPrice
+              : d.usage.max.quote
+            : this.long
+            ? d.usage.max.quote
+            : d.usage.max.base * d.startPrice)) *
+          100,
+        2,
+      )
+      d.profit.total = this.math.round(d.profit.total, this.precision + 3)
+      d.profit.totalUsd = this.math.round(d.profit.totalUsd, 2)
+      profit = d.profit
+      if (this.combo) {
+        totalDiffProfit = 0
+      }
+    }
+
+    if (profit) {
+      if (profit.total > 0) {
+        if (Strategy.previousDeal && Strategy.previousDeal.profit.total < 0) {
+          Strategy.seriesWin.count = 0
+          Strategy.seriesLoss.count = 0
+        }
+        Strategy.seriesWin.count += 1
+      }
+      if (profit.total < 0) {
+        if (Strategy.previousDeal && Strategy.previousDeal.profit.total > 0) {
+          Strategy.seriesWin.count = 0
+          Strategy.seriesLoss.count = 0
+        }
+        Strategy.seriesLoss.count += 1
+      }
+    }
+    this.updateStats(profit?.total, totalDiffProfit)
     if (Strategy.seriesWin.count > Strategy.maxConsecutiveWins) {
       Strategy.maxConsecutiveWins = Strategy.seriesWin.count
     }
@@ -3046,10 +3079,12 @@ export abstract class Strategy implements StrategyInterface {
     const openedDeals = Strategy.deals.filter((d) => d.status === 'open')
     const workingDays = this.math.round(workingTime / (24 * 60 * 60 * 1000), 4)
     const profitDeals = Strategy.deals.filter(
-      (d) => d.profit.perc > 0 && d.status === 'closed',
+      (d) =>
+        d.profit.totalUsd > 0 && (this.combo ? true : d.status === 'closed'),
     )
     const lossDeals = Strategy.deals.filter(
-      (d) => d.profit.perc <= 0 && d.status === 'closed',
+      (d) =>
+        d.profit.totalUsd <= 0 && (this.combo ? true : d.status === 'closed'),
     )
     const allProfit = profitDeals.reduce((acc, d) => (acc += d.profit.total), 0)
     const allProfitUsd =
@@ -3414,8 +3449,12 @@ export abstract class Strategy implements StrategyInterface {
         confidenceGrade: confidenceGrade.level,
         dealsForConfidenceGrade: confidenceGrade.number,
         all: Strategy.deals.length,
-        profit: profitDeals.length,
-        loss: lossDeals.length,
+        profit: profitDeals.filter((d) =>
+          this.combo ? d.status === 'closed' : true,
+        ).length,
+        loss: lossDeals.filter((d) =>
+          this.combo ? d.status === 'closed' : true,
+        ).length,
         open: openedDeals.length,
         closed: closedDeals.length,
         maxConsecutiveLosses: Strategy.maxConsecutiveLosses,
