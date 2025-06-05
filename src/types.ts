@@ -1181,7 +1181,7 @@ export type Deal = {
     buy: number
     sell: number
   }
-  mingrids: Minigrid[]
+  minigrids: Minigrid[]
   initialOrders: FullGrid[]
   id: string
   filledOrders: (FullGrid & { dealId: string })[]
@@ -1257,7 +1257,7 @@ export type PreparedDeal = {
     buy: number
     sell: number
   }
-  mingrids: PreparedMinigrid[]
+  minigrids: PreparedMinigrid[]
   id: string
   filledOrders: PreparedGrid[]
   ordersHistory: (PreparedGrid & {
