@@ -3,6 +3,7 @@ import { checkNumber } from '../../helper/utils'
 import DCABotFunctions from '../../helper/dcaBotFunctions'
 import ComboBotFunctions from '../../helper/comboBotFunctions'
 import { PriceCalculator } from './helpers/PriceCalculator'
+import { StrategyUtils, CandleTypeEnum } from './helpers/StrategyUtils'
 import {
   DCAOrderTypeEnum,
   StrategyEnum,
@@ -151,11 +152,6 @@ export interface StrategyInterface {
   _start: number
 }
 
-enum CandleTypeEnum {
-  bull = 'bull',
-  bear = 'bear',
-}
-
 const fundsWarning =
   'The bot used more funds than allocated, this might not be accurate in live trading. Please check your settings.'
 
@@ -170,16 +166,7 @@ export abstract class Strategy implements StrategyInterface {
 
   static indicatorEvents: IndicatorsEvents[] = []
 
-  static emptyPositon = {
-    qty: 0,
-    entryPrice: 0,
-    liquidationPrice: 0,
-    side: PositionSide.LONG,
-  }
-
   public settings: DCABotSettings
-
-  private readonly botFunctions: Map<string, DCABotFunctions> = new Map()
 
   static workingShift: { start: number; end?: number }[] = []
 
@@ -273,6 +260,9 @@ export abstract class Strategy implements StrategyInterface {
   /** Price calculation helper for USD conversions and average price operations */
   private priceCalculator!: PriceCalculator
 
+  /** Strategy utilities helper for small utility operations */
+  private strategyUtils!: StrategyUtils
+
   private readonly userFee: number
 
   private readonly usdRate: Map<string, number> = new Map()
@@ -287,18 +277,9 @@ export abstract class Strategy implements StrategyInterface {
 
   private readonly precisionBase: Map<string, number> = new Map()
 
-  private readonly prices: Prices
-
-  private readonly symbols: Map<string, Symbols> = new Map()
-
   private readonly balances?: Asset[] | null
 
   private gridsOnPrice: Map<string, DCAGrid[]> = new Map()
-
-  private pricesCache: Map<
-    string,
-    ReturnType<DCABotFunctions['utils']['getPrices']>
-  > = new Map()
 
   static interval: ExchangeIntervals
 
@@ -434,7 +415,6 @@ export abstract class Strategy implements StrategyInterface {
     Strategy.balanceForProfit = 0
     Strategy.startRate = 0
     Strategy.initialBalanceUsd = 0
-    Strategy.position = new Map()
     Strategy.edge = undefined
     Strategy.previousResult = undefined
     Strategy.multi = false
@@ -452,9 +432,8 @@ export abstract class Strategy implements StrategyInterface {
 
     // Reset helper classes data
     PriceCalculator.resetData()
+    StrategyUtils.resetData()
   }
-
-  static position: Map<string, typeof Strategy.emptyPositon> = new Map()
 
   private usedOrderId: Set<string> = new Set()
 
@@ -532,12 +511,14 @@ export abstract class Strategy implements StrategyInterface {
             (b.high >= o.price && b.low <= o.price) || b.high <= o.price,
     }
     prices = prices.filter((p) => (p.exchange ? p.exchange === exchange : true))
+    const _symbols: Map<string, Symbols> = new Map()
+    const _botFunctions: Map<string, DCABotFunctions> = new Map()
     for (const s of symbols) {
       const bu = Strategy.combo
         ? new ComboBotFunctions(settings, s, userFee, trades)
         : new DCABotFunctions(settings, s, userFee)
-      this.symbols.set(s.pair, s)
-      this.botFunctions.set(s.pair, bu)
+      _symbols.set(s.pair, s)
+      _botFunctions.set(s.pair, bu)
       this.usdRate.set(
         s.pair,
         findUSDRate(
@@ -557,24 +538,27 @@ export abstract class Strategy implements StrategyInterface {
     this.userFee = userFee
     this.openDeal = this.openDeal.bind(this)
     this.checkDeals = this.checkDeals.bind(this)
-    this.prices = prices
     Strategy.interval = interval
     this.balances = balances
     this.slippage = slippage
 
     // Initialize shared PriceCalculator data
-    PriceCalculator.initialize(
-      this.symbols,
-      this.prices,
-      this.botFunctions,
-      this.pricesCache,
-    )
+    PriceCalculator.initialize(_symbols, prices, _botFunctions)
+
+    // Initialize shared StrategyUtils data
+    StrategyUtils.initialize()
 
     // Initialize helper classes with instance-specific configuration
     this.priceCalculator = new PriceCalculator(
       this.profitBase,
       this.long,
       Strategy.combo,
+    )
+    this.strategyUtils = new StrategyUtils(
+      this.futures,
+      this.leverage,
+      this.userFee,
+      this.long,
     )
   }
 
@@ -709,7 +693,7 @@ export abstract class Strategy implements StrategyInterface {
               ? 1 + overValue / 100
               : 1),
         }))
-        /* const orders = this.botFunctions
+        /* const orders = PriceCalculator.botFunctions
           .get(symbol)
           ?.createOrders(
             this.usdRateQuote.get(symbol) ?? 0,
@@ -1066,7 +1050,7 @@ export abstract class Strategy implements StrategyInterface {
             : price + data * atrMultiplier
         }
         if (!isNaN(value)) {
-          const symbol = this.symbols.get(pair)
+          const symbol = PriceCalculator.symbols.get(pair)
           const precisionPrice = symbol?.priceAssetPrecision
           const precisionQuote = this.precisionQuote.get(pair) ?? 8
           const precisionBase = this.precisionBase.get(pair) ?? 8
@@ -1244,22 +1228,6 @@ export abstract class Strategy implements StrategyInterface {
     return result
   }
 
-  private convertCooldown(interval?: number, units?: CooldownUnits) {
-    if (!interval || !units) {
-      return 0
-    }
-    return (
-      interval *
-      (units === CooldownUnits.seconds
-        ? 1000
-        : units === CooldownUnits.minutes
-        ? 60 * 1000
-        : units === CooldownUnits.hours
-        ? 60 * 60 * 1000
-        : 24 * 60 * 60 * 1000)
-    )
-  }
-
   private checkCooldownStart(time: number, symbol: string) {
     if (this.settings.cooldownAfterDealStart && this.settings.useCooldown) {
       const cooldownAfterDealStartOption =
@@ -1272,7 +1240,7 @@ export abstract class Strategy implements StrategyInterface {
           : Strategy.lastOpenedDealPerSymbol.get(symbol) ?? 0
       return (
         time - lastTime >=
-        this.convertCooldown(
+        StrategyUtils.convertCooldown(
           this.settings.cooldownAfterDealStartInterval,
           this.settings.cooldownAfterDealStartUnits,
         )
@@ -1292,7 +1260,7 @@ export abstract class Strategy implements StrategyInterface {
           (cooldownAfterDealStartOption === CooldownOptionsEnum.bot
             ? Strategy.lastClosedDeal
             : Strategy.lastClosedDealPerSymbol.get(symbol) ?? 0) >=
-        this.convertCooldown(
+        StrategyUtils.convertCooldown(
           this.settings.cooldownAfterDealStopInterval,
           this.settings.cooldownAfterDealStopUnits,
         )
@@ -1317,73 +1285,16 @@ export abstract class Strategy implements StrategyInterface {
     return this.settings.coinm
   }
 
-  private updatePositionWithOrder(order: DCAGrid, s: string) {
-    if (!order) {
-      return
-    }
-    if (this.futures) {
-      let position = Strategy.position.get(s)
-      if (!position) {
-        position = Strategy.emptyPositon
-      }
-      const margin = order.qty
-      const sameDirection =
-        (position.side === PositionSide.LONG &&
-          order.side === BotOrderSideEnum.buy) ||
-        (position.side === PositionSide.SHORT &&
-          order.side === BotOrderSideEnum.sell)
-      const liquidationPrice = (entryPrice: number, pos: PositionSide) =>
-        entryPrice *
-        (this.leverage > 1
-          ? 1 + (1 / this.leverage) * (pos === PositionSide.LONG ? -1 : 1) /* *
-              (1 + this.userFee * (position === PositionSide.LONG ? 1 : -1)) */
-          : pos === PositionSide.LONG
-          ? this.userFee
-          : 1 / this.userFee)
-
-      if (sameDirection || position.qty === 0) {
-        const entryPrice =
-          (position.qty * position.entryPrice + order.qty * order.price) /
-          (position.qty + order.qty)
-        const side = this.long ? PositionSide.LONG : PositionSide.SHORT
-        position = {
-          side,
-          qty: position.qty + margin,
-          entryPrice,
-          liquidationPrice: liquidationPrice(entryPrice, side),
-        }
-      } else {
-        const diff = position.qty - order.qty
-        if (Math.abs(diff) <= Number.EPSILON) {
-          position = Strategy.emptyPositon
-        } else if (diff < 0) {
-          const side =
-            position.side === PositionSide.SHORT
-              ? PositionSide.LONG
-              : PositionSide.SHORT
-          position = {
-            qty: -diff,
-            entryPrice: order.price,
-            side,
-            liquidationPrice: liquidationPrice(order.price, side),
-          }
-        } else {
-          position.qty -= margin
-        }
-      }
-      Strategy.position.set(s, position)
-    }
-  }
-
   private generateGridsOnPrice(
     minigrid: Minigrid,
     price: number,
     side: BotOrderSideEnum,
     s: string,
   ) {
-    const { long, settings, symbols } = this
+    const { long, settings } = this
+    const { symbols, botFunctions: bf } = PriceCalculator
     const symbol = symbols.get(s)
-    const botFunctions = this.botFunctions.get(s)
+    const botFunctions = bf.get(s)
     if (!symbol || !botFunctions) {
       return []
     }
@@ -1463,7 +1374,7 @@ export abstract class Strategy implements StrategyInterface {
     s: string,
     _initialPrice?: number,
   ): Minigrid | undefined {
-    const symbol = this.symbols.get(s)
+    const symbol = PriceCalculator.symbols.get(s)
     if (!symbol) {
       return
     }
@@ -1512,7 +1423,9 @@ export abstract class Strategy implements StrategyInterface {
       initialOrders: [],
       filledOrders: [],
       activeOrders: [],
-      id: this.botFunctions.values().next().value?.utils.id(20) ?? 'unknown',
+      id:
+        PriceCalculator.botFunctions.values().next().value?.utils.id(20) ??
+        'unknown',
       dealId: deal.id,
       dcaOrderId: startOrder.id,
       grids: { buy: 0, sell: 0 },
@@ -1576,7 +1489,7 @@ export abstract class Strategy implements StrategyInterface {
     deal: Deal,
     startTime?: number,
   ): Deal['ordersHistory'] {
-    const botFunctions = this.botFunctions.get(deal.symbol.pair)
+    const botFunctions = PriceCalculator.botFunctions.get(deal.symbol.pair)
     if (!botFunctions) {
       return []
     }
@@ -1643,7 +1556,7 @@ export abstract class Strategy implements StrategyInterface {
   }
 
   private getBalances(s: string): Asset[] | null | undefined {
-    const symbol = this.symbols.get(s)
+    const symbol = PriceCalculator.symbols.get(s)
     if (!symbol) {
       return this.balances
     }
@@ -1903,8 +1816,8 @@ export abstract class Strategy implements StrategyInterface {
       }
       dynamicAr = dynamic
     }
-    const symbol = this.symbols.get(s)
-    const botFunctions = this.botFunctions.get(s)
+    const symbol = PriceCalculator.symbols.get(s)
+    const botFunctions = PriceCalculator.botFunctions.get(s)
     if (!symbol || !botFunctions) {
       return cbIfNotOpened && cbIfNotOpened()
     }
@@ -1989,7 +1902,7 @@ export abstract class Strategy implements StrategyInterface {
       return
     }
     if (!onlyReturn) {
-      this.updatePositionWithOrder(baseOrder, s)
+      this.strategyUtils.updatePositionWithOrder(baseOrder, s)
     }
     initialOrders =
       this.settings.useRiskReward && this.settings.riskUseTpRatio
@@ -2392,8 +2305,8 @@ export abstract class Strategy implements StrategyInterface {
     if (Strategy.combo) {
       return { deal: d }
     }
-    const botFunctions = this.botFunctions.get(b.symbol)
-    const symbol = this.symbols.get(b.symbol)
+    const botFunctions = PriceCalculator.botFunctions.get(b.symbol)
+    const symbol = PriceCalculator.symbols.get(b.symbol)
     if (!botFunctions || !symbol) {
       return { deal: d }
     }
@@ -2404,7 +2317,7 @@ export abstract class Strategy implements StrategyInterface {
       .filter((o) => o.type === DCAOrderTypeEnum.tp)
       .filter(this.filterFn.filledTp(b))
     for (const tp of filledTp) {
-      this.updatePositionWithOrder(tp, b.symbol)
+      this.strategyUtils.updatePositionWithOrder(tp, b.symbol)
     }
     if (
       this.settings.useMultiTp &&
@@ -2550,8 +2463,8 @@ export abstract class Strategy implements StrategyInterface {
     profitQuote: number
     profitUsdt: number
   } {
-    const symbol = this.symbols.get(minigrid.symbol.pair)
-    const botFunctions = this.botFunctions.get(minigrid.symbol.pair)
+    const symbol = PriceCalculator.symbols.get(minigrid.symbol.pair)
+    const botFunctions = PriceCalculator.botFunctions.get(minigrid.symbol.pair)
     if (!symbol || !botFunctions) {
       return { profitBase: 0, profitQuote: 0, profitUsdt: 0 }
     }
@@ -2936,7 +2849,7 @@ export abstract class Strategy implements StrategyInterface {
       (mg) => mg.status === 'open' && mg.symbol.pair === b.symbol,
     )) {
       mIds.push(m.id)
-      const botFunctions = this.botFunctions.get(m.symbol.pair)
+      const botFunctions = PriceCalculator.botFunctions.get(m.symbol.pair)
       let grids = m.activeOrders.filter((g) => g.type === DCAOrderTypeEnum.grid)
       let total = 0
       let totalUsd = 0
@@ -2952,7 +2865,7 @@ export abstract class Strategy implements StrategyInterface {
         m.filledOrders.push(o)
         m.notUsedFilledOrders.push(o)
         d.filledOrders.push({ ...o, dealId: d.id })
-        this.updatePositionWithOrder(o, b.symbol)
+        this.strategyUtils.updatePositionWithOrder(o, b.symbol)
         m.avgPrice = this.priceCalculator.avgPriceAfterOrder(o, m)
         const profit = this.createTransaction(o, m)
         total += this.profitBase ? profit.profitBase : profit.profitQuote
@@ -2986,7 +2899,7 @@ export abstract class Strategy implements StrategyInterface {
         m.filledOrders.push(o)
         m.notUsedFilledOrders.push(o)
         d.filledOrders.push({ ...o, dealId: d.id })
-        this.updatePositionWithOrder(o, b.symbol)
+        this.strategyUtils.updatePositionWithOrder(o, b.symbol)
         m.avgPrice = this.priceCalculator.avgPriceAfterOrder(o, m)
         const profit = this.createTransaction(o, m)
         total += this.profitBase ? profit.profitBase : profit.profitQuote
@@ -3172,7 +3085,7 @@ export abstract class Strategy implements StrategyInterface {
           (i) => i.indicatorAction === IndicatorAction.startDca,
         )[index]
         if (ind) {
-          const botFunctions = this.botFunctions.get(d.symbol.pair)
+          const botFunctions = PriceCalculator.botFunctions.get(d.symbol.pair)
           if (!botFunctions) {
             continue
           }
@@ -3236,7 +3149,7 @@ export abstract class Strategy implements StrategyInterface {
             }
           }
         }
-        this.updatePositionWithOrder(o, b.symbol)
+        this.strategyUtils.updatePositionWithOrder(o, b.symbol)
         d.lastPrice = o.price
         d.lastTime = o.filledTime
       }
@@ -3348,8 +3261,8 @@ export abstract class Strategy implements StrategyInterface {
     ) {
       return { deal: d }
     }
-    const symbol = this.symbols.get(d.symbol.pair)
-    const botFunctions = this.botFunctions.get(d.symbol.pair)
+    const symbol = PriceCalculator.symbols.get(d.symbol.pair)
+    const botFunctions = PriceCalculator.botFunctions.get(d.symbol.pair)
     if (!symbol || !botFunctions) {
       return { deal: d }
     }
@@ -3397,7 +3310,7 @@ export abstract class Strategy implements StrategyInterface {
             sl.tpSlTarget &&
             !(d.tpSlTargetFilled ?? []).includes(sl.tpSlTarget)
           ) {
-            this.updatePositionWithOrder(sl, b.symbol)
+            this.strategyUtils.updatePositionWithOrder(sl, b.symbol)
             d.tpSlTargetFilled = [...(d.tpSlTargetFilled ?? []), sl.tpSlTarget]
           }
         }
@@ -3680,7 +3593,7 @@ export abstract class Strategy implements StrategyInterface {
       if (Strategy.combo && this.profitBase) {
         slOrder = this.getTP(d, slOrder.price, false, true)[0]
       }
-      this.updatePositionWithOrder(slOrder, b.symbol)
+      this.strategyUtils.updatePositionWithOrder(slOrder, b.symbol)
       return { deal: d, order: slOrder }
     }
     return { deal: d }
@@ -3747,8 +3660,8 @@ export abstract class Strategy implements StrategyInterface {
       (d) => (!stop && this.checkMinTp(b.open, d, sl ? 'sl' : 'tp')) || stop,
     )
     for (const d of allDeals) {
-      const position = Strategy.emptyPositon
-      Strategy.position.set(b.symbol, position)
+      const position = StrategyUtils.emptyPosition
+      StrategyUtils.position.set(b.symbol, position)
       const tp = ignoreTp ? undefined : this.getTP(d, b.open, true, false)[0]
       this.closeDeal(d, b, tp)
       this.processDealCloseFromMap(d)
@@ -3980,12 +3893,8 @@ export abstract class Strategy implements StrategyInterface {
     return { deal: d, closePrice }
   }
 
-  private getCandleType(b: FullBar) {
-    return b.close >= b.open ? CandleTypeEnum.bull : CandleTypeEnum.bear
-  }
-
   private checkTrailing(d: Deal, price: number, time: number) {
-    const botFunctions = this.botFunctions.get(d.symbol.pair)
+    const botFunctions = PriceCalculator.botFunctions.get(d.symbol.pair)
     if (!botFunctions) {
       return d
     }
@@ -4046,7 +3955,7 @@ export abstract class Strategy implements StrategyInterface {
     if (!this.futures) {
       return
     }
-    let current = Strategy.position.get(b.symbol)
+    let current = StrategyUtils.position.get(b.symbol)
     if (!current) {
       return
     }
@@ -4070,8 +3979,8 @@ export abstract class Strategy implements StrategyInterface {
         this.closeDeal(d, b, tp, current.liquidationPrice)
         this.processDealCloseFromMap(d)
       }
-      current = Strategy.emptyPositon
-      Strategy.position.set(b.symbol, current)
+      current = StrategyUtils.emptyPosition
+      StrategyUtils.position.set(b.symbol, current)
       if (this.settings.startCondition === StartConditionEnum.asap) {
         this.openDeal(current.liquidationPrice, b.time, b.high, b.low, b.symbol)
       }
@@ -4096,7 +4005,7 @@ export abstract class Strategy implements StrategyInterface {
             : 24 * 60 * 60 * 1000)
       if (closeTime <= b.time) {
         const order = this.getTP(d, b.open, true, false, closeTime)[0]
-        this.updatePositionWithOrder(order, b.symbol)
+        this.strategyUtils.updatePositionWithOrder(order, b.symbol)
         return order
       }
     }
@@ -4117,7 +4026,7 @@ export abstract class Strategy implements StrategyInterface {
     }
     Strategy.portfolioTimes.add(key)
     const openDeal = Strategy.getDeals('open', symbol)
-    const fullSymbol = this.symbols.get(symbol)
+    const fullSymbol = PriceCalculator.symbols.get(symbol)
     const baseBalance =
       Strategy.balance.get(fullSymbol?.baseAsset.name ?? '') ?? 0
     const quoteBalance =
@@ -4207,7 +4116,7 @@ export abstract class Strategy implements StrategyInterface {
     }
     for (const o of openDeal) {
       const price = _price
-      const position = Strategy.position.get(o.symbol.pair)
+      const position = StrategyUtils.position.get(o.symbol.pair)
       if (position) {
         const unPnL =
           (position?.side === PositionSide.LONG
@@ -4292,7 +4201,7 @@ export abstract class Strategy implements StrategyInterface {
     if (b.symbol === Strategy.lowestDataForBnHSymbol) {
       Strategy.lowestDataForBnH.set(b.time, b)
     }
-    const fullSymbol = this.symbols.get(b.symbol)
+    const fullSymbol = PriceCalculator.symbols.get(b.symbol)
     if (fullSymbol) {
       const k = this.futures
         ? this.coinm
@@ -4317,7 +4226,7 @@ export abstract class Strategy implements StrategyInterface {
       const bLowClose = { ...b, high: b.close }
       const bHighClose = { ...b, low: b.close }
       const bOpenLow = { ...b, high: b.open }
-      const candleType = this.getCandleType(b)
+      const candleType = StrategyUtils.getCandleType(b)
       let closePrice = 0
       if (this.long && !tpOrder) {
         if (candleType === CandleTypeEnum.bull) {
@@ -4491,7 +4400,7 @@ export abstract class Strategy implements StrategyInterface {
     if (d.changed) {
       return d
     }
-    const botFunctions = this.botFunctions.get(d.symbol.pair)
+    const botFunctions = PriceCalculator.botFunctions.get(d.symbol.pair)
     if (!botFunctions) {
       return d
     }
@@ -4538,8 +4447,8 @@ export abstract class Strategy implements StrategyInterface {
     const {
       settings: { tpPerc, useMultiTp, multiTp, useMultiSl, multiSl },
     } = this
-    const symbol = this.symbols.get(deal.symbol.pair)
-    const botFunctions = this.botFunctions.get(deal.symbol.pair)
+    const symbol = PriceCalculator.symbols.get(deal.symbol.pair)
+    const botFunctions = PriceCalculator.botFunctions.get(deal.symbol.pair)
     if (!symbol || !botFunctions) {
       return []
     }
@@ -5019,8 +4928,8 @@ export abstract class Strategy implements StrategyInterface {
     if (!this.futures) {
       return
     }
-    const symbol = this.symbols.get(s)
-    const botFunctions = this.botFunctions.get(s)
+    const symbol = PriceCalculator.symbols.get(s)
+    const botFunctions = PriceCalculator.botFunctions.get(s)
     if (!symbol || !botFunctions) {
       return
     }
@@ -5319,11 +5228,11 @@ export abstract class Strategy implements StrategyInterface {
     processingTime: number,
   ): DCABacktestingResult {
     this.gridsOnPrice = new Map()
-    this.pricesCache = new Map()
+    PriceCalculator.pricesCache = new Map()
     const startResultProcessing = new Date().getTime()
     let allDeals = Strategy.getDeals()
     allDeals = allDeals.map((d) => {
-      const symbol = this.symbols.get(d.symbol.pair)
+      const symbol = PriceCalculator.symbols.get(d.symbol.pair)
       if (!symbol) {
         return d
       }
@@ -5469,11 +5378,13 @@ export abstract class Strategy implements StrategyInterface {
 
     if (openedDeals.length > 0) {
       for (const od of openedDeals) {
-        const symbol = this.symbols.get(od.symbol.pair)
+        const symbol = PriceCalculator.symbols.get(od.symbol.pair)
         if (!symbol) {
           continue
         }
-        const price = this.prices.find((p) => p.symbol === symbol.pair)
+        const price = PriceCalculator.prices.find(
+          (p) => p.symbol === symbol.pair,
+        )
         if (price) {
           const tp = this.getTP(
             od,
@@ -5689,7 +5600,7 @@ export abstract class Strategy implements StrategyInterface {
     const buyAndHold = this.getBuyAndHold(firstData, lastData)
     const symbolStats: SymbolStats[] = []
     if (allDeals.length < maxDealsPerResult) {
-      for (const s of this.symbols.keys()) {
+      for (const s of PriceCalculator.symbols.keys()) {
         const deals = allDeals.filter((d) => d.symbol.pair === s)
         const maxSymbolValue =
           this.settings.orderSizeType === OrderSizeTypeEnum.percFree ||
@@ -5726,7 +5637,7 @@ export abstract class Strategy implements StrategyInterface {
         const profit = Strategy.totalProfitPerSymbol.get(s) ?? 0
         const profitUsd = Strategy.totalProfitUsdPerSymbol.get(s) ?? 0
         const precisionStats = this.precision.get(s) ?? 8
-        const symbol = this.symbols.get(s)
+        const symbol = PriceCalculator.symbols.get(s)
         const maxDealDuration = deals.length
           ? friendlyTime(Math.max(...deals.map((cd) => cd.duration)))
           : { d: '', h: '', min: '', s: '' }
@@ -6062,7 +5973,7 @@ export abstract class Strategy implements StrategyInterface {
       ),
       maxLeverage: allDeals.filter((d) => !!d.liquidationPrice).length
         ? Math.min(
-            ...Array.from(this.symbols.keys()).map(
+            ...Array.from(PriceCalculator.symbols.keys()).map(
               (s) => this.getMaxLeverage(s) ?? 1,
             ),
           )
@@ -6287,7 +6198,7 @@ export abstract class Strategy implements StrategyInterface {
       profits: Strategy.profits,
       multi: Strategy.multi,
       multiPairs: Strategy.multi
-        ? Array.from(this.symbols.keys()).length
+        ? Array.from(PriceCalculator.symbols.keys()).length
         : undefined,
       periodicStats,
     }

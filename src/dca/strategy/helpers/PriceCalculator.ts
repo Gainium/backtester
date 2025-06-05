@@ -12,10 +12,10 @@ import type DCABotFunctions from '../../../helper/dcaBotFunctions'
  */
 export class PriceCalculator {
   // Shared data across all strategy instances
-  private static symbols: Map<string, Symbols>
-  private static prices: Prices
-  private static botFunctions: Map<string, DCABotFunctions>
-  private static pricesCache: Map<
+  public static symbols: Map<string, Symbols>
+  public static prices: Prices
+  public static botFunctions: Map<string, DCABotFunctions>
+  public static pricesCache: Map<
     string,
     ReturnType<DCABotFunctions['utils']['getPrices']>
   >
@@ -38,12 +38,11 @@ export class PriceCalculator {
     symbols: Map<string, Symbols>,
     prices: Prices,
     botFunctions: Map<string, DCABotFunctions>,
-    pricesCache: Map<string, ReturnType<DCABotFunctions['utils']['getPrices']>>,
   ) {
     PriceCalculator.symbols = symbols
     PriceCalculator.prices = prices
     PriceCalculator.botFunctions = botFunctions
-    PriceCalculator.pricesCache = pricesCache
+    PriceCalculator.pricesCache = new Map()
   }
 
   /**
