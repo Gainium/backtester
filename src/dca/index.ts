@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
-import Backtesting from '..'
+import Backtesting from '../base'
 import { v4 } from 'uuid'
 
 import {
@@ -116,6 +116,7 @@ class DCABacktesting extends Backtesting {
     if (this.strategy) {
       return this.strategy.getOtherIntervals()
     }
+    return []
   }
 
   public async test(
@@ -321,7 +322,7 @@ class DCABacktesting extends Backtesting {
           }
         }
         if (this._stop) {
-          return
+          return undefined
         }
         const processingTime = (new Date().getTime() - start) / 1000
         if (this.strategy && lowest) {
@@ -337,6 +338,7 @@ class DCABacktesting extends Backtesting {
           }
           return result
         }
+        return undefined
       })
   }
 
@@ -347,6 +349,7 @@ class DCABacktesting extends Backtesting {
     if (this.strategy) {
       return this.strategy.returnResult(firstData, lastData, 0, 0)
     }
+    return undefined
   }
 
   public passTradeCandleData(

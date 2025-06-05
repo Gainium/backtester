@@ -230,9 +230,7 @@ class ComboBotFunctions extends DcaBotFunctions {
       initialPrice: baseOrder.price,
       futures: !!settings.futures,
       coinm: !!settings.coinm,
-      profitCurrency: settings.futures
-        ? 'quote'
-        : settings.profitCurrency /*  'quote' as const */,
+      profitCurrency: settings.futures ? 'quote' : settings.profitCurrency,
       orderFixedIn: settings.futures
         ? settings.coinm
           ? ('quote' as const)
@@ -247,13 +245,6 @@ class ComboBotFunctions extends DcaBotFunctions {
       combo: true,
       _side: BotOrderSideEnum.buy,
     }
-    /* console.log('-----------------------')
-    console.log(
-      'base order before',
-      baseOrder.qty,
-      baseOrder.qty * baseOrder.price,
-    )
-    console.log('base order budget', gridSettings.budget) */
     const baseGridSettings = {
       ...gridSettings,
       lowPrice: long
@@ -299,7 +290,6 @@ class ComboBotFunctions extends DcaBotFunctions {
           latestPrice,
         precision,
       )
-      /* console.log('base order used budget', qtyByGrids) */
       baseOrder.qty = qtyByGrids
       baseOrder.quote = this.math.round(
         baseOrder.qty * baseOrder.price,
@@ -322,11 +312,6 @@ class ComboBotFunctions extends DcaBotFunctions {
               false,
               true,
             )
-      /*  console.log('base order used budget', qtyByGrids)
-      console.log(
-        'base order budget check condition',
-        !long && qtyByGrids > baseOrder.quote * (2 - feeFactor),
-      ) */
       if (
         (useBase && qtyByGrids > baseOrder.qty) ||
         (!useBase && qtyByGrids > baseOrder.quote * (2 - feeFactor)) ||
@@ -377,12 +362,6 @@ class ComboBotFunctions extends DcaBotFunctions {
       }
     }
     let orders: DCAGrid[] = []
-    /* console.log(
-      'base order after',
-      baseOrder.qty,
-      baseOrder.qty * baseOrder.price,
-    )
-    console.log('-----------------------') */
     if (settings.useDca) {
       for (let i = 1; i <= parseInt(`${settings.ordersCount}`); i++) {
         const stepVal = stepScale ** (i - 1)

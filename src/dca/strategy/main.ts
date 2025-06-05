@@ -76,54 +76,192 @@ import {
 
 export type Bar = BarTV
 
+/**
+ * Core strategy input configuration for DCA backtesting.
+ *
+ * This interface defines all the required and optional parameters needed
+ * to initialize and run a DCA (Dollar Cost Averaging) backtesting strategy.
+ *
+ * @example Basic usage
+ * ```typescript
+ * const strategyInput: StrategyInput = {
+ *   settings: dcaBotSettings,
+ *   symbols: [{ pair: 'BTCUSDT', baseAsset: {...}, quoteAsset: {...} }],
+ *   userFee: 0.001,
+ *   prices: priceData,
+ *   interval: ExchangeIntervals['1h'],
+ *   exchange: ExchangeEnum.BINANCE
+ * };
+ * ```
+ */
 export type StrategyInput = {
+  /** DCA bot configuration settings */
   settings: DCABotSettings
+  /** Trading pair symbols with asset information */
   symbols: Symbols[]
+  /** User trading fee percentage (e.g., 0.001 for 0.1%) */
   userFee: number
+  /** Market price data for USD conversion */
   prices: Prices
+  /** Primary timeframe for strategy execution */
   interval: ExchangeIntervals
+  /** Optional initial portfolio balances */
   balances?: Asset[] | null
+  /** Optional slippage percentage for realistic simulation */
   slippage?: number
+  /** Whether this is a combo strategy (multi-asset) */
   combo?: boolean
+  /** Whether to include individual trade data in results */
   trades?: boolean
+  /** Edge backtesting mode for advanced analytics */
   edge?: EdgeBacktestEnum
+  /** Previous backtest results for continuation */
   previousData?: DCABacktestingResult
+  /** Enable multi-deal support per symbol */
   multi?: boolean
+  /** Timezone for time-based calculations */
   timezone?: string | null
+  /** Include full detailed results */
   fullResult?: boolean
+  /** Use file-based data processing */
   useFile?: boolean
+  /** Target exchange for backtesting */
   exchange: ExchangeEnum
 }
 
+/**
+ * Market data container for strategy backtesting.
+ *
+ * Organizes candlestick data by timeframe for multi-interval strategies.
+ */
 export type DataType = {
+  /** Array of market bars (OHLC data) */
   bar: FullBar[]
+  /** Timeframe interval for this data set */
   interval: ExchangeIntervals
 }
 
+/**
+ * Core interface that all DCA backtesting strategies must implement.
+ *
+ * This interface defines the contract for strategy implementations, ensuring
+ * consistent behavior across different DCA trading strategies. All concrete
+ * strategy classes (Timer, Combined, ASAP, etc.) must implement these methods.
+ *
+ * Key responsibilities:
+ * - Data loading and preprocessing
+ * - Bar-by-bar market data processing
+ * - Deal opening/closing logic
+ * - Portfolio management and tracking
+ * - Result generation and reporting
+ *
+ * @example Implementing a custom strategy
+ * ```typescript
+ * class CustomStrategy extends Strategy implements StrategyInterface {
+ *   async test(): Promise<void> {
+ *     // Implementation required
+ *   }
+ *
+ *   async preTest(): Promise<void> {
+ *     // Implementation required
+ *   }
+ *
+ *   // ... other required methods
+ * }
+ * ```
+ */
 export interface StrategyInterface {
+  /**
+   * Gets additional timeframe intervals required by the strategy.
+   * Used for multi-timeframe analysis and indicator calculations.
+   *
+   * @returns Array of interval configurations with count-back requirements
+   */
   getOtherIntervals(): { interval: ExchangeIntervals; countBack: number }[]
+
+  /**
+   * Loads market data into the strategy for backtesting.
+   *
+   * @param data - Market data organized by timeframes
+   * @param start - Optional starting timestamp for data filtering
+   */
   loadData(data: DataType[], start?: number): void
+
+  /**
+   * Executes the main backtesting process.
+   * Processes market data chronologically to simulate trading performance.
+   *
+   * @param start - Starting timestamp for backtest period
+   * @param end - Ending timestamp for backtest period
+   * @param updateProgress - Optional progress callback for UI updates
+   * @param total - Total number of operations for progress calculation
+   */
   test(
     start: number,
     end: number,
     updateProgress?: (value: number, text: string) => void,
     total?: number,
   ): Promise<void>
+
+  /**
+   * Pre-test initialization and validation.
+   * Called before main test execution to prepare strategy state.
+   */
   preTest(): Promise<void>
+
+  /**
+   * Initializes a new working shift period.
+   * Used for session-based trading and performance tracking.
+   *
+   * @param start - Starting timestamp of the working shift
+   */
   startWorkingShift(start: number): void
+
+  /**
+   * Processes a single market bar (candlestick) for trading decisions.
+   * Core method where trading logic is executed for each time period.
+   *
+   * @param checkPortfolio - Whether to perform portfolio checks
+   * @param bar - Market bar data with OHLC information
+   * @param interval - Optional specific interval for this bar
+   */
   processBar(
     checkPortfolio: boolean,
     bar: FullBar,
     interval?: ExchangeIntervals,
   ): Promise<void>
+
+  /**
+   * Processes individual trade events for real-time simulation.
+   * Used for tick-by-tick backtesting with higher granularity.
+   *
+   * @param trade - Individual trade data
+   * @param candles - Associated candlestick data for context
+   */
   processTrade(
     trade: TradeResponse,
     candles: { candle: FullBar[] | null; interval: ExchangeIntervals }[],
   ): void
+
+  /**
+   * Optional method for passing trade data with candlestick context.
+   * Provides additional flexibility for trade processing implementations.
+   */
   passTradeCandleData?: (
     trade: TradeResponse,
     candles: { candle: FullBar[] | null; interval: ExchangeIntervals }[],
   ) => void
+
+  /**
+   * Opens a new DCA deal based on strategy conditions.
+   *
+   * @param price - Entry price for the deal
+   * @param startTime - Timestamp when deal was opened
+   * @param high - Highest price during the bar
+   * @param low - Lowest price during the bar
+   * @param symbol - Trading pair symbol
+   * @param onlyReturn - If true, returns deal object without executing
+   */
   openDeal(
     price: number,
     startTime: number,
@@ -132,43 +270,155 @@ export interface StrategyInterface {
     symbol: string,
     onlyReturn?: boolean,
   ): void
+
+  /**
+   * Checks and manages existing deals for stop-loss, take-profit, etc.
+   *
+   * @param checkPortfolio - Whether to update portfolio calculations
+   * @param b - Current market bar for price checking
+   * @param cbClose - Optional callback when deals are closed
+   */
   checkDeals(
     checkPortfolio: boolean,
     b: FullBar,
     cbClose?: (price: number) => void,
   ): void
+
+  /**
+   * Checks if a price is within acceptable range for deal opening.
+   * Used for range-bound trading strategies and risk management.
+   *
+   * @param symbol - Trading pair symbol
+   * @param price - Price to check
+   * @param time - Timestamp for the check
+   * @returns True if price is in acceptable range
+   */
   checkInRange(symbol: string, price: number, time: number): boolean
+
+  /**
+   * Generates final backtesting results with performance metrics.
+   *
+   * @param firstData - Market data from start of backtest
+   * @param lastData - Market data from end of backtest
+   * @param loadingTime - Time spent loading data (ms)
+   * @param processingTime - Time spent processing (ms)
+   * @returns Comprehensive backtesting results
+   */
   returnResult(
     firstData: Map<string, FullBar>,
     lastData: Map<string, FullBar>,
     loadingTime: number,
     processingTime: number,
   ): DCABacktestingResult
-  long: boolean
-  profitBase: boolean
+
+  /** Whether this is a long (buy-first) strategy */
+  readonly long: boolean
+
+  /** Whether profits are calculated in base asset */
+  readonly profitBase: boolean
+
+  /** Whether the strategy should stop execution */
   stop: boolean
+
+  /** Internal start timestamp */
   _start: number
 }
 
+/**
+ * Candlestick pattern types for market analysis.
+ * Used to classify market sentiment and trend direction.
+ */
 enum CandleTypeEnum {
+  /** Bullish candlestick (close > open) */
   bull = 'bull',
+  /** Bearish candlestick (close < open) */
   bear = 'bear',
 }
 
+/**
+ * Warning message displayed when bot exceeds allocated funds.
+ * This helps users understand potential discrepancies between backtest and live trading.
+ */
 const fundsWarning =
   'The bot used more funds than allocated, this might not be accurate in live trading. Please check your settings.'
 
+/**
+ * Maximum number of deals to include in detailed results.
+ * Prevents memory issues with very long backtests while maintaining useful data.
+ */
 const maxDealsPerResult = 50 * 1000
 
+/**
+ * Abstract base class for all DCA (Dollar Cost Averaging) backtesting strategies.
+ *
+ * This class provides the foundational framework for implementing various DCA trading
+ * strategies. It manages market data processing, deal lifecycle, portfolio tracking,
+ * and performance analytics in a comprehensive backtesting environment.
+ *
+ * Key features:
+ * - Multi-timeframe market data support
+ * - Comprehensive deal management and tracking
+ * - Real-time portfolio value calculations
+ * - Advanced performance metrics and analytics
+ * - Support for multiple trading pairs simultaneously
+ * - Timezone-aware processing
+ * - Memory-efficient data handling
+ *
+ * Architecture:
+ * - Uses static properties for shared state across strategy instances
+ * - Implements factory pattern for bot function creation
+ * - Supports both file-based and memory-based data processing
+ * - Provides extensible framework for custom trading logic
+ *
+ * Performance considerations:
+ * - Optimized for processing large datasets (millions of bars)
+ * - Memory-efficient caching and data structures
+ * - Batch processing capabilities for improved throughput
+ *
+ * @example Creating a custom strategy
+ * ```typescript
+ * class MyStrategy extends Strategy {
+ *   async test(): Promise<void> {
+ *     for (const bar of Strategy.data[0].bar) {
+ *       await this.processBar(false, bar);
+ *     }
+ *   }
+ *
+ *   async preTest(): Promise<void> {
+ *     // Custom initialization logic
+ *   }
+ * }
+ * ```
+ *
+ * @example Basic usage
+ * ```typescript
+ * const strategy = new MyStrategy({
+ *   settings: botSettings,
+ *   symbols: [{ pair: 'BTCUSDT', ... }],
+ *   userFee: 0.001,
+ *   prices: priceData,
+ *   interval: ExchangeIntervals['1h'],
+ *   exchange: ExchangeEnum.BINANCE
+ * });
+ *
+ * await strategy.test(startTime, endTime);
+ * const results = strategy.returnResult(firstData, lastData, 0, 0);
+ * ```
+ */
 export abstract class Strategy implements StrategyInterface {
+  /** Whether this is a combination strategy managing multiple assets */
   static combo = false
 
+  /** Set of timestamps for portfolio calculations to avoid duplicates */
   static portfolioTimes: Set<string> = new Set()
 
+  /** Set of candlestick timestamps processed to track progress */
   static candleTimes: Set<string> = new Set()
 
+  /** Array of indicator events for technical analysis tracking */
   static indicatorEvents: IndicatorsEvents[] = []
 
+  /** Empty position object for initialization and reset purposes */
   static emptyPositon = {
     qty: 0,
     entryPrice: 0,
@@ -176,19 +426,31 @@ export abstract class Strategy implements StrategyInterface {
     side: PositionSide.LONG,
   }
 
+  /** DCA bot configuration settings for this strategy instance */
   public settings: DCABotSettings
 
+  /** Map of bot function instances per trading pair for isolated logic */
   private readonly botFunctions: Map<string, DCABotFunctions> = new Map()
 
+  /** Array of working shift periods for session-based analytics */
   static workingShift: { start: number; end?: number }[] = []
 
+  /** Whether the strategy is currently operating within defined range limits */
   static rangeStatus = false
 
+  /** Array of informational messages generated during backtesting */
   static messages: string[] = []
 
+  /**
+   * Tracking maximum resource usage across the backtesting session.
+   * Used for monitoring memory efficiency and fund allocation.
+   */
   static maxUsage: {
+    /** Maximum funds used by a single deal */
     deal: number
+    /** Maximum total funds used by the bot */
     bot: number
+    /** Maximum quote currency funds used */
     botQuote: number
   } = {
     deal: 0,
@@ -196,54 +458,112 @@ export abstract class Strategy implements StrategyInterface {
     botQuote: 0,
   }
 
+  /**
+   * Multi-dimensional map for organizing deals by symbol and status.
+   * Structure: Map<symbol, Map<statusId, Map<dealId, Deal>>>
+   * Provides O(1) access to deals for efficient management.
+   */
   static dealsBySymbolsStatusId: Map<string, Map<string, Map<string, Deal>>> =
     new Map()
 
+  /** Array of all profit/loss transactions for detailed analysis */
   static profits: Profit[] = []
 
+  /**
+   * Order execution filter functions based on strategy direction.
+   * Optimized closures for determining when orders would be filled.
+   */
   private filterFn: {
+    /** Function to check if regular orders would be filled at given bar */
     filledOrders: (b: FullBar) => (o: FullGrid) => boolean
+    /** Function to check if take-profit orders would be filled at given bar */
     filledTp: (b: FullBar) => (o: FullGrid) => boolean
   }
 
+  /**
+   * Maximum profit achieved during the backtesting session.
+   * Tracks both absolute and percentage gains for comprehensive analysis.
+   */
   static maxProfit = {
+    /** Maximum profit in base asset */
     asset: 0,
+    /** Maximum profit in USD equivalent */
     usd: 0,
+    /** Maximum profit as percentage */
     perc: 0,
   }
 
+  /**
+   * Maximum loss encountered during the backtesting session.
+   * Used for drawdown analysis and risk assessment.
+   */
   static maxLoss = {
+    /** Maximum loss in base asset */
     asset: 0,
+    /** Maximum loss in USD equivalent */
     usd: 0,
+    /** Maximum loss as percentage */
     perc: 0,
   }
 
+  /**
+   * Statistics for consecutive winning streaks.
+   * Provides insights into strategy consistency and momentum.
+   */
   static seriesWin = {
+    /** Number of consecutive wins in current streak */
     count: 0,
+    /** Total value of current winning streak */
     value: 0,
+    /** Total USD value of current winning streak */
     valueUsd: 0,
+    /** Minimum value in any winning streak */
     min: 0,
+    /** Minimum USD value in any winning streak */
     minUsd: 0,
+    /** Maximum value in any winning streak */
     max: 0,
+    /** Maximum USD value in any winning streak */
     maxUsd: 0,
+    /** Percentage gain in current winning streak */
     perc: 0,
   }
 
+  /**
+   * Statistics for expected losses during winning streaks.
+   * Tracks temporary drawdowns within overall profitable periods.
+   */
   static seriesLossE = {
+    /** USD value of expected losses */
     valueUsd: 0,
+    /** Minimum USD loss in expected loss period */
     minUsd: 0,
+    /** Maximum USD loss in expected loss period */
     maxUsd: 0,
+    /** Percentage of expected losses */
     perc: 0,
   }
 
+  /**
+   * Statistics for consecutive losing streaks.
+   * Critical for risk management and strategy evaluation.
+   */
   static seriesLoss = {
+    /** Number of consecutive losses in current streak */
     count: 0,
+    /** Total value of current losing streak */
     value: 0,
+    /** Total USD value of current losing streak */
     valueUsd: 0,
+    /** Minimum value in any losing streak */
     min: 0,
+    /** Minimum USD value in any losing streak */
     minUsd: 0,
+    /** Maximum value in any losing streak */
     max: 0,
+    /** Maximum USD value in any losing streak */
     maxUsd: 0,
+    /** Percentage loss in current losing streak */
     perc: 0,
   }
 
@@ -352,6 +672,29 @@ export abstract class Strategy implements StrategyInterface {
 
   static status: 'open' | 'closed' | 'monitoring' = 'open'
 
+  /**
+   * Resets all static data and state to initial values.
+   *
+   * This method clears all accumulated state from previous backtesting runs,
+   * ensuring clean initialization for new tests. It resets:
+   * - All performance metrics and statistics
+   * - Deal tracking and profit/loss data
+   * - Portfolio values and working shifts
+   * - Market data mappings and caches
+   * - Execution state and indicators
+   *
+   * Call this method before starting a new backtesting session to avoid
+   * contamination from previous runs.
+   *
+   * @static
+   * @example
+   * ```typescript
+   * // Clean slate before new backtest
+   * Strategy.resetData();
+   * const strategy = new MyStrategy(config);
+   * await strategy.test(startTime, endTime);
+   * ```
+   */
   static resetData() {
     Strategy.status = 'open'
     Strategy.preventOpen = false
@@ -477,6 +820,83 @@ export abstract class Strategy implements StrategyInterface {
 
   static lowestDataForBnH: Map<number, FullBar> = new Map()
 
+  /**
+   * Validates strategy input parameters to ensure proper configuration.
+   *
+   * @param input - Strategy input to validate
+   * @throws {Error} If validation fails
+   * @private
+   */
+  private validateStrategyInput(input: StrategyInput): void {
+    const { settings, symbols, userFee, prices, exchange } = input
+
+    if (!settings) {
+      throw new Error('Strategy settings are required')
+    }
+
+    if (!symbols || symbols.length === 0) {
+      throw new Error('At least one trading symbol must be provided')
+    }
+
+    if (typeof userFee !== 'number' || userFee < 0 || userFee > 1) {
+      throw new Error('User fee must be a number between 0 and 1 (0-100%)')
+    }
+
+    if (!prices || prices.length === 0) {
+      throw new Error('Price data is required for USD conversions')
+    }
+
+    if (!exchange) {
+      throw new Error('Exchange specification is required')
+    }
+
+    // Validate symbol structure
+    for (const symbol of symbols) {
+      if (!symbol.pair || !symbol.baseAsset || !symbol.quoteAsset) {
+        throw new Error(`Invalid symbol structure: ${JSON.stringify(symbol)}`)
+      }
+    }
+  }
+
+  /**
+   * Creates a new Strategy instance with the provided configuration.
+   *
+   * Initializes all necessary components for backtesting including:
+   * - Bot function instances for each trading pair
+   * - USD rate conversions for profit calculations
+   * - Precision settings for accurate order sizing
+   * - Order execution filters based on strategy direction
+   * - Portfolio and balance tracking
+   *
+   * The constructor performs several critical setup tasks:
+   * 1. Validates input parameters and settings
+   * 2. Creates isolated bot function instances per symbol
+   * 3. Calculates USD conversion rates for all assets
+   * 4. Sets up order execution logic based on long/short strategy
+   * 5. Initializes portfolio tracking and balance management
+   * 6. Configures precision settings for accurate calculations
+   *
+   * @param input - Complete strategy configuration including settings, symbols, and market data
+   * @throws {Error} If required settings are missing or invalid
+   *
+   * @example
+   * ```typescript
+   * const strategy = new MyStrategy({
+   *   settings: {
+   *     ...dcaBotSettings,
+   *     dealStartDelay: 60000,  // 1 minute delay
+   *     tpPercent: 2.5,         // 2.5% take profit
+   *   },
+   *   symbols: [
+   *     { pair: 'BTCUSDT', baseAsset: {...}, quoteAsset: {...} }
+   *   ],
+   *   userFee: 0.001,           // 0.1% fee
+   *   prices: priceData,
+   *   interval: ExchangeIntervals['1h'],
+   *   exchange: ExchangeEnum.BINANCE
+   * });
+   * ```
+   */
   constructor(input: StrategyInput) {
     const {
       settings,
@@ -493,6 +913,10 @@ export abstract class Strategy implements StrategyInterface {
       exchange,
     } = input
     let { prices } = input
+
+    // Input validation
+    this.validateStrategyInput(input)
+
     if (!combo) {
       Strategy.edge = edge
       Strategy.previousResult = previousData
@@ -556,18 +980,67 @@ export abstract class Strategy implements StrategyInterface {
     this.slippage = slippage
   }
 
+  /**
+   * Sets the internal stop flag to halt strategy execution.
+   *
+   * @param value - True to stop execution, false to continue
+   */
   public set stop(value: boolean) {
     this._stop = value
   }
 
+  /**
+   * Updates the strategy settings during runtime.
+   *
+   * @param settings - New DCA bot settings to apply
+   */
   public set settingsUpdate(settings: DCABotSettings) {
     this.settings = settings
   }
 
+  /**
+   * Sets the internal start timestamp for the strategy.
+   *
+   * @param value - Starting timestamp in milliseconds
+   */
   public set _start(value: number) {
     Strategy.start = value
   }
 
+  /**
+   * Loads market data for backtesting and creates optimized lookup structures.
+   *
+   * This method prepares the market data for efficient access during backtesting:
+   * - Stores raw data arrays for sequential processing
+   * - Creates time-based lookup maps for random access
+   * - Organizes data by intervals for multi-timeframe strategies
+   * - Sets up timestamp-based indexing for performance
+   *
+   * The data is organized into a two-level map structure:
+   * - First level: timeframe interval (1m, 5m, 1h, etc.)
+   * - Second level: timestamp@symbol -> bar data
+   *
+   * This structure enables O(1) lookups for specific bars while maintaining
+   * chronological order for strategy execution.
+   *
+   * @param data - Array of market data organized by timeframes
+   * @param start - Optional starting timestamp to filter data
+   *
+   * @example
+   * ```typescript
+   * const marketData = [
+   *   {
+   *     interval: ExchangeIntervals['1h'],
+   *     bar: [
+   *       { time: 1640995200000, open: 47000, high: 47500, low: 46800, close: 47200, symbol: 'BTCUSDT' },
+   *       // ... more bars
+   *     ]
+   *   }
+   * ];
+   *
+   * strategy.loadData(marketData, startTimestamp);
+   * ```
+   */
   public loadData(data: DataType[], start?: number): void {
     Strategy.start = start ?? 0
     Strategy.data = data
@@ -665,11 +1138,9 @@ export abstract class Strategy implements StrategyInterface {
                 settings.dynamicPriceFilterDirection ===
                   DynamicPriceFilterDirectionEnum.overAndUnder
               ? 1 - underValue / 100
-              : 1) /* d.startPrice */,
+              : 1),
           end:
-            /*  ([...d.initialOrders].sort((a, b) =>
-              this.long ? a.price - b.price : b.price - a.price,
-            )?.[0]?.price || d.startPrice) */ (settings.dynamicPriceFilterPriceType ===
+            (settings.dynamicPriceFilterPriceType ===
             DynamicPriceFilterPriceTypeEnum.avg
               ? d.avgPrice
               : d.startPrice) *
@@ -687,27 +1158,10 @@ export abstract class Strategy implements StrategyInterface {
               ? 1 + overValue / 100
               : 1),
         }))
-        /* const orders = this.botFunctions
-          .get(symbol)
-          ?.createOrders(
-            this.usdRateQuote.get(symbol) ?? 0,
-            price,
-            true,
-            undefined,
-            undefined,
-            this.getBalances(symbol),
-            true,
-            [],
-            true,
-          )
-          ?.filter((o) => o.type === DCAOrderTypeEnum.dca)
-        const currentDealPrice =
-          orders?.sort((a, b) =>
-            this.long ? a.price - b.price : b.price - a.price,
-          )?.[0]?.price || price */
+
         const currentRange = {
           start: price,
-          end: price /* +currentDealPrice */,
+          end: price,
         }
         const isCurrentDealRangeIsInRanges = ranges.some((r) => {
           const isInRange = this.long
@@ -772,15 +1226,10 @@ export abstract class Strategy implements StrategyInterface {
     }
     const result = dynamic && staticResult
     const last = Strategy.workingShift[Strategy.workingShift.length - 1]
-    /* const notSetRange =
-      useDynamicPriceFilter &&
-      !useStaticPriceFilter &&
-      (dynamic || (!dynamic && Strategy.getDealsCount('open', symbol) > 0)) */
     if (
       !staticResult &&
       Strategy.workingShift.length > 0 &&
-      !Strategy.rangeStatus /* &&
-      !notSetRange */
+      !Strategy.rangeStatus
     ) {
       if (!last.end) {
         last.end = time
@@ -1313,8 +1762,7 @@ export abstract class Strategy implements StrategyInterface {
       const liquidationPrice = (entryPrice: number, pos: PositionSide) =>
         entryPrice *
         (this.leverage > 1
-          ? 1 + (1 / this.leverage) * (pos === PositionSide.LONG ? -1 : 1) /* *
-              (1 + this.userFee * (position === PositionSide.LONG ? 1 : -1)) */
+          ? 1 + (1 / this.leverage) * (pos === PositionSide.LONG ? -1 : 1)
           : pos === PositionSide.LONG
           ? this.userFee
           : 1 / this.userFee)
@@ -1720,19 +2168,6 @@ export abstract class Strategy implements StrategyInterface {
     if (!use) {
       return null
     }
-    /* const findLastDeal = Strategy.getDeals('closed').sort(
-      (a, b) => (b.closedTime ?? 0) - (a.closedTime ?? 0),
-    )[0]
-    if (!findLastDeal) {
-      return null
-    }
-
-    if (
-      (findLastDeal.profit.totalUsd > 0 && !this.settings.useReinvest) ||
-      (findLastDeal.profit.totalUsd < 0 && !this.settings.useRiskReduction)
-    ) {
-      return null
-    } */
 
     const profit = Strategy.totalProfit
 
@@ -2293,15 +2728,9 @@ export abstract class Strategy implements StrategyInterface {
     )
   }
 
-  private updateDealVolume(deal: Deal /* , bar: FullBar */) {
-    const usdRateQuote =
-      /* this.getUsdRate(deal.symbol.pair, bar.close, 'quote') */ this.usdRateQuote.get(
-        deal.symbol.pair,
-      ) ?? 1
-    const usdRate =
-      /* this.getUsdRate(deal.symbol.pair, bar.close) */ this.usdRate.get(
-        deal.symbol.pair,
-      ) ?? 1
+  private updateDealVolume(deal: Deal) {
+    const usdRateQuote = this.usdRateQuote.get(deal.symbol.pair) ?? 1
+    const usdRate = this.usdRate.get(deal.symbol.pair) ?? 1
     const _usageBase =
       this.comboBasedOn === ComboTpBase.full
         ? deal.usage.max.base
@@ -2464,10 +2893,6 @@ export abstract class Strategy implements StrategyInterface {
             d.currentBalance.quote / d.avgPrice,
             symbol.baseAsset.minAmount,
           )
-      /* const profit = this.getProfit(d)
-      if (profit) {
-        d.profit = profit
-      } */
 
       return { deal: d, order: allFilled ? lastTp : undefined }
     }
@@ -3539,10 +3964,6 @@ export abstract class Strategy implements StrategyInterface {
               d.currentBalance.quote / d.avgPrice,
               symbol.baseAsset.minAmount,
             )
-        /* const profit = this.getProfit(d)
-        if (profit) {
-          d.profit = profit
-        } */
         return { deal: d, order: allFilled ? lastSl : undefined }
       }
     } else if (
@@ -3683,33 +4104,6 @@ export abstract class Strategy implements StrategyInterface {
               (qty * (this.long ? 1 : -1))
           closePrice = requiredPrice
         }
-
-        /* if (close) {
-          console.log(
-            b,
-            'sl order',
-            qty,
-            'base',
-            base,
-            'qty',
-            quoteTp,
-            'qtp',
-            quote,
-            'q',
-            d.profit.total,
-            'deal',
-            perc,
-            'perc',
-            total,
-            'total',
-            denominator,
-            'deno',
-            commission,
-            'fee',
-            closePrice,
-            'close price',
-          )
-        } */
       }
     }
     if (hasUnPnl && !close) {
@@ -3966,12 +4360,6 @@ export abstract class Strategy implements StrategyInterface {
         Strategy.maxLoss.usd = profit.totalUsd
         Strategy.maxLoss.perc = profit.perc
       }
-      /* if (profit.totalUsd > 0 && profit.totalUsd > Strategy.maxProfitUsd) {
-        Strategy.maxProfitUsd = profit.totalUsd
-      }
-      if (profit.totalUsd < 0 && profit.totalUsd < Strategy.maxLossUsd) {
-        Strategy.maxLossUsd = profit.totalUsd
-      } */
       if (!Strategy.previousDeal && profit.total > 0) {
         Strategy.maxConsecutiveWins = 1
         Strategy.seriesWin.value = balance - initialBalance
@@ -4213,6 +4601,7 @@ export abstract class Strategy implements StrategyInterface {
         return order
       }
     }
+    return undefined
   }
 
   private replacePortfolioValue(time: number, val: number, shared: number) {
@@ -4376,6 +4765,7 @@ export abstract class Strategy implements StrategyInterface {
         }
       }
     }
+    return undefined
   }
 
   public async checkDeals(
@@ -4608,7 +4998,7 @@ export abstract class Strategy implements StrategyInterface {
     if (!botFunctions) {
       return d
     }
-    if (botFunctions.isTrailingSl /* || botFunctions.isTrailingTp */) {
+    if (botFunctions.isTrailingSl) {
       return d
     }
     if (
@@ -4775,17 +5165,6 @@ export abstract class Strategy implements StrategyInterface {
     ) {
       return [{ ...tpOrder, qty: 0 }]
     }
-    /* if (
-      tpOrder.price * tpOrder.qty < symbol.quoteAsset.minAmount &&
-      !this.futures
-    ) {
-      tpOrder.qty = this.math.round(
-        symbol.quoteAsset.minAmount / tpOrder.price,
-        precision,
-        false,
-        true,
-      )
-    } */
     let tpOrders = [tpOrder]
     if (aggregate) {
       return tpOrders
@@ -4825,12 +5204,6 @@ export abstract class Strategy implements StrategyInterface {
           if (qtyTp > restQty) {
             qtyTp = restQty
           }
-          /* if (qtyTp < symbol.baseAsset.minAmount) {
-            qtyTp = symbol.baseAsset.minAmount
-          }
-          if (priceTp * qtyTp < symbol.quoteAsset.minAmount) {
-            qtyTp = symbol.quoteAsset.minAmount / priceTp
-          } */
           const modQty = this.math.remainder(
             this.math.round(qtyTp, 12),
             symbol.baseAsset.step,
@@ -5068,33 +5441,11 @@ export abstract class Strategy implements StrategyInterface {
       ? base
       : quote
     const perc = this.math.round(
-      (total / denominator) * 100 * /* Strategy.combo ? 1 : */ this.leverage,
+      (total / denominator) * 100 * this.leverage,
       2,
       false,
       true,
     )
-    /* console.log(
-      'profit',
-      base,
-      'base',
-      qty,
-      'qty',
-      quoteTp,
-      'qtp',
-      quote,
-      'q',
-      d.profit.total,
-      'deal',
-      perc,
-      'perc',
-      total,
-      'total',
-      denominator,
-      'deno',
-      commission,
-      'fee',
-      { ...d },
-    ) */
     return {
       total: this.math.round(total, precision, false, true),
       totalUsd: this.math.round(totalUsd, 2),
@@ -5102,10 +5453,26 @@ export abstract class Strategy implements StrategyInterface {
     }
   }
 
+  /**
+   * Determines if this is a long (buy-first) strategy.
+   *
+   * Long strategies buy first and then sell at higher prices for profit.
+   * This affects order execution logic, profit calculations, and risk management.
+   *
+   * @returns True if strategy is configured for long trades
+   */
   get long() {
     return this.settings.strategy === StrategyEnum.long
   }
 
+  /**
+   * Determines if profits should be calculated in base asset instead of quote asset.
+   *
+   * For futures trading with coin-margined contracts, profits are always in base asset.
+   * For spot trading, this depends on the user's profit currency preference setting.
+   *
+   * @returns True if profits should be calculated in base asset
+   */
   get profitBase() {
     return (
       (this.futures && this.coinm) ||
@@ -5113,6 +5480,17 @@ export abstract class Strategy implements StrategyInterface {
     )
   }
 
+  /**
+   * Gets the appropriate USD conversion rate for profit calculations.
+   *
+   * The rate selection depends on:
+   * - Whether this is futures or spot trading
+   * - Strategy direction (long/short)
+   * - Profit calculation currency (base/quote)
+   *
+   * @returns USD conversion rate for accurate profit reporting
+   * @private
+   */
   private getRate() {
     const usdRateQuote = this.usdRateQuote.values().next().value ?? 1
     const usdRateBase = this.usdRateBase.values().next().value ?? 1
@@ -5168,6 +5546,7 @@ export abstract class Strategy implements StrategyInterface {
         : 1 / (extremum / avgPrice - 1)
       return Math.max(this.math.round(maxLeverage, 0, true), 1)
     }
+    return undefined
   }
 
   private getConfidenceGrade(): { level: string; number: number } {
@@ -5215,14 +5594,8 @@ export abstract class Strategy implements StrategyInterface {
       firstPrice && lastPrice
         ? (buyAndHoldUsage / firstPrice) * lastPrice - buyAndHoldUsage
         : 0
-    /* const buyAndHoldLastEquity =
-      (firstPrice && lastPrice
-        ? (buyAndHoldUsage / firstPrice) * lastPrice
-        : 0) * this.leverage */
     const lowestData = Array.from(Strategy.lowestDataForBnH.values())
     const buyAndHoldEquity: BuyAndHoldEquity[] = []
-    /*     buyAndHoldEquity.push({ value: buyAndHoldUsage, time: firstData.time })
-    buyAndHoldEquity.push({ value: buyAndHoldLastEquity, time: lastData.time }) */
     if (lowestData.length > 2) {
       const steps = Math.min(Math.floor(lowestData.length / 2), 500)
       const step = Math.floor(lowestData.length / steps)
@@ -5655,55 +6028,22 @@ export abstract class Strategy implements StrategyInterface {
             ((Strategy.combo
               ? this.futures
                 ? this.coinm
-                  ? od.usage.max.base /* * (this.profitBase ? 1 : tpPrice) */
-                  : od.usage.max.quote /* / (this.profitBase ? tpPrice : 1) */
+                  ? od.usage.max.base
+                  : od.usage.max.quote
                 : this.long
-                ? od.usage.max.quote /* / (this.profitBase ? tpPrice : 1) */
-                : od.usage.max.base /* * (this.profitBase ? 1 : tpPrice) */
+                ? od.usage.max.quote
+                : od.usage.max.base
               : this.futures
               ? this.coinm
-                ? od.usage.current.base /* * (this.profitBase ? 1 : tpPrice) */
-                : od.usage.current.quote /* / (this.profitBase ? tpPrice : 1) */
+                ? od.usage.current.base
+                : od.usage.current.quote
               : this.long
-              ? od.usage.current.quote /*  / (this.profitBase ? tpPrice : 1) */
-              : od.usage.current.base) /* * (this.profitBase ? 1 : tpPrice) */ /
+              ? od.usage.current.quote
+              : od.usage.current.base) /
               this.leverage) *
             this.getRate()
-          /* const baseAmount = od.currentBalance.base / this.leverage
-          const quoteAmount = od.currentBalance.quote / this.leverage
-          const baseRate = this.getUsdRate(od.symbol.pair, tpPrice, 'base')
-          const quoteRate = this.getUsdRate(od.symbol.pair, tpPrice, 'quote')
-          od.portfolio = {
-            base: this.math.round(baseAmount * baseRate, 3),
-            quote: this.math.round(quoteAmount * quoteRate, 3),
-          }
-          od.lastTime = lastDataItem?.time
-          Strategy.deals = Strategy.deals.map((d) => {
-            if (d.id === od.id) {
-              return od
-            }
-            return d
-          }) */
         }
       }
-      /*  if (this.futures) {
-        for (const od of openedDeals) {
-          od.portfolio = {
-            base: this.coinm
-              ? this.math.round(unrealizedPnLUsd + Strategy.balanceUsd, 3)
-              : 0,
-            quote: this.coinm
-              ? 0
-              : this.math.round(unrealizedPnLUsd + Strategy.balanceUsd, 3),
-          }
-          Strategy.deals = Strategy.deals.map((d) => {
-            if (d.id === od.id) {
-              return od
-            }
-            return d
-          })
-        }
-      } */
     }
     const levels = allDeals.map((d) => d.levels.max)
     const maxDealUsage = this.math.round(
@@ -5789,15 +6129,6 @@ export abstract class Strategy implements StrategyInterface {
     ].includes(this.settings.orderSizeType)
       ? Strategy.initialBalanceUsd
       : maxTheoreticalUsageValue * this.getRate()
-    /* Strategy.deals = Strategy.deals.map((d) => {
-      if (!Strategy.combo) {
-        d.ordersHistory = d.ordersHistory.filter(
-          (oh) =>
-            oh.type !== DCAOrderTypeEnum.bo && oh.type !== DCAOrderTypeEnum.dca,
-        )
-      }
-      return d
-    }) */
     const confidenceGrade = this.getConfidenceGrade()
     const buyAndHold = this.getBuyAndHold(firstData, lastData)
     const symbolStats: SymbolStats[] = []
@@ -5809,12 +6140,7 @@ export abstract class Strategy implements StrategyInterface {
           this.settings.orderSizeType === OrderSizeTypeEnum.percTotal
             ? Strategy.initialBalanceUsd
             : Math.max(
-                .../* this.settings.orderSizeType === OrderSizeTypeEnum.percFree ||
-          this.settings.orderSizeType === OrderSizeTypeEnum.percTotal
-            ? [deals.sort((a, b) => a.startTime - b.startTime)[0]].filter(
-                (d) => !!d,
-              )
-            : */ deals.map(
+                ...deals.map(
                   (d) =>
                     (this.futures
                       ? this.coinm
@@ -6113,12 +6439,6 @@ export abstract class Strategy implements StrategyInterface {
     stDevDownLoss = isNaN(stDevDownLoss) ? 0 : stDevDownLoss
     let stDevLoss = this.math.stDev(lossDeals.map((d) => d.profit.perc))
     stDevLoss = isNaN(stDevLoss) ? 0 : stDevLoss
-    /* if (lastDataItem) {
-      this.replacePortfolioValue(
-        lastDataItem.time,
-        Strategy.balanceUsd + unrealizedPnLUsd,
-      )
-    } */
     const maxDealDuration = allDeals.length
       ? Math.max(...allDeals.map((cd) => cd.duration))
       : 0

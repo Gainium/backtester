@@ -1,4 +1,4 @@
-import Backtesting from '..'
+import Backtesting from '../base'
 
 import { ExchangeIntervals } from '../types'
 
@@ -106,6 +106,7 @@ class DCABacktesting extends Backtesting {
     if (this.strategy) {
       return this.strategy.returnResult(firstData, lastData, 0, 0)
     }
+    return undefined
   }
 
   public getTestingPeriod() {

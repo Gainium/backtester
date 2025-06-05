@@ -146,8 +146,6 @@ export class Strategy implements StrategyInterface {
 
   private transactionIndex = 0
 
-  /* private prices: Prices = [] */
-
   private botClosed = false
 
   private botClosedAndSell = false
@@ -221,7 +219,6 @@ export class Strategy implements StrategyInterface {
     this.precisionQuote = this.botFunctions.utils.getPrecision(symbol).quote
     this.interval = interval
     this.processBar = this.processBar.bind(this)
-    /* this.prices = prices.filter((p) => p.exchange === exchange) */
     this.pricesWOutSymbols = prices.filter((p) => p.symbol !== this.symbol.pair)
   }
 
@@ -246,15 +243,6 @@ export class Strategy implements StrategyInterface {
           )
         : this.usdRate
     }
-    /* this.botFunctions.initPrice = this.data[0]?.close ?? 0 */
-    /*     if (this.profitBase) {
-      this.firstUsdRate =
-        findUSDRate(this.symbol.quoteAsset.name, this.prices) *
-        (this.data[0]?.close ?? 0)
-      this.lastUsdRate =
-        findUSDRate(this.symbol.quoteAsset.name, this.prices) *
-        (this.data[this.data.length - 1]?.close ?? 0)
-    } */
   }
 
   public getOtherIntervals(): ExchangeIntervals[] {
@@ -1354,8 +1342,6 @@ export class Strategy implements StrategyInterface {
         ? (buyAndHoldUsage / firstPrice) * lastPrice - buyAndHoldUsage
         : 0
     const buyAndHoldEquity: BuyAndHoldEquity[] = []
-    /*     buyAndHoldEquity.push({ value: buyAndHoldUsage, time: firstData.time })
-    buyAndHoldEquity.push({ value: buyAndHoldLastEquity, time: lastData.time }) */
     const lowestData = this.data
     if (lowestData.length > 2) {
       const data: Bar[] = []

@@ -1,11 +1,62 @@
-yarn-error.log
-node_modules
-.eslintcache
-.env
-dist
+# Dependencies
+node_modules/
 .yarn/*
 !.yarn/releases
 !.yarn/plugins
 .pnp.*
+
+# Build output
+dist/
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.test
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Cache directories
+.npm
+.eslintcache
+.cache/
+
+# Temporary folders
+tmp/
+temp/
+*.tmp
+*.temp
+
+# OS generated files
 .DS_Store
-# Note: dist folder is included in git for distribution
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+coverage/
+.nyc_output
+
+# Backtester specific
+tmp-backtester/

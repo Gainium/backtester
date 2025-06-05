@@ -814,7 +814,6 @@ class DCABotFunctions {
       }
     }
     if (orders.length && useOutsideSl && outsideSl && !fixSl) {
-      /*  const tempOrders = [...orders] */
       let i = 0
       for (const o of orders) {
         const order = orders[i]
@@ -841,29 +840,6 @@ class DCABotFunctions {
         }
         i++
       }
-      /*   do {
-          const order = tempOrders[i]
-          finalBreakeven = order.avgPrice ?? latestPrice
-          tempOrders = tempOrders.filter((o) =>
-            long ? o.price > slOrder.price : o.price < slOrder.price,
-          )
-          finalBreakeven = tempOrders[tempOrders.length - 1]
-            ? tempOrders?.[tempOrders.length - 1].avgPrice ?? latestPrice
-            : latestPrice
-          slOrder.price = this.math.round(
-            finalBreakeven *
-              (1 +
-                (settings.strategy === StrategyEnum.long ? 1 : -1) * slPerc +
-                (useFixedSLPrices ? 0 : this.userFee * 2)),
-            symbol?.priceAssetPrecision ?? 8,
-          )
-        } while (
-          tempOrders.filter(
-            (o) =>
-              o.type === DCAOrderTypeEnum.dca &&
-              (long ? o.price <= slOrder.price : o.price >= slOrder.price),
-          ).length
-        ) */
     }
     let slOrders = [slOrder]
     if (settings.useMultiSl) {

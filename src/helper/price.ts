@@ -23,6 +23,7 @@ const findRate = (
   if (!reverse) {
     return findRate(quote, base, prices, true)
   }
+  return undefined
 }
 
 const findUSDRate = (asset: string, _prices: Prices, exchange?: string) => {
