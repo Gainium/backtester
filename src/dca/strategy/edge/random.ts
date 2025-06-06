@@ -9,6 +9,8 @@ import {
   timeIntervalMap,
   FullBar,
 } from '../../../types'
+import { DealManager } from '../helpers/DealManager'
+import { SharedData } from '../helpers/SharedData'
 
 /**
  * Edge Random Strategy - A random entry strategy for testing and edge case analysis
@@ -58,7 +60,7 @@ class EdgeRandomStrategy extends Strategy implements StrategyInterface {
    * @returns Promise that resolves when test is complete
    */
   public async test(): Promise<void> {
-    const primaryData = Strategy.data[0]
+    const primaryData = SharedData.data[0]
     if (!primaryData?.bar) {
       return
     }
@@ -75,8 +77,8 @@ class EdgeRandomStrategy extends Strategy implements StrategyInterface {
    * @returns Promise that resolves when pre-test setup is complete
    */
   public async preTest(): Promise<void> {
-    const data = Strategy.data.find((d) => d.interval === Strategy.interval)
-    if (!data?.bar || !Strategy.previousResult) {
+    const data = SharedData.data.find((d) => d.interval === SharedData.interval)
+    if (!data?.bar || !SharedData.previousResult) {
       return
     }
 
@@ -95,7 +97,7 @@ class EdgeRandomStrategy extends Strategy implements StrategyInterface {
     )
 
     const timeToClose = Math.floor(
-      (timeIntervalMap[Strategy.interval] * step) / 1000,
+      (timeIntervalMap[SharedData.interval] * step) / 1000,
     )
 
     const maxIndex = Math.max(1, barCount - EdgeRandomStrategy.DEFAULT_INTERVAL)
@@ -111,8 +113,8 @@ class EdgeRandomStrategy extends Strategy implements StrategyInterface {
     this.generateRandomStartTimes(data.bar, maxIndex, maxStartTimes)
 
     // Configure strategy settings for random edge testing
-    this.settings = {
-      ...this.settings,
+    SharedData.settings = {
+      ...SharedData.settings,
       closeByTimer: true,
       closeByTimerUnits: CooldownUnits.seconds,
       closeByTimerValue: timeToClose,
@@ -121,7 +123,7 @@ class EdgeRandomStrategy extends Strategy implements StrategyInterface {
       useTp: true,
       dealCloseCondition: CloseConditionEnum.webhook,
       maxNumberOfOpenDeals: '-1',
-      baseOrderSize: `${Strategy.previousResult.usage.avgRealUsage}`,
+      baseOrderSize: `${SharedData.previousResult.usage.avgRealUsage}`,
     }
   }
 
@@ -182,21 +184,21 @@ class EdgeRandomStrategy extends Strategy implements StrategyInterface {
     bar: FullBar,
   ): Promise<void> {
     // Early return if no deals are configured
-    if (!Strategy.getDeals()) {
+    if (!DealManager.getDeals()) {
       return
     }
 
     // Start working shift if conditions are met
     if (
-      Strategy.workingShift.length === 0 &&
-      ((Strategy.start && bar.time >= Strategy.start) || !Strategy.start)
+      SharedData.workingShift.length === 0 &&
+      ((SharedData.start && bar.time >= SharedData.start) || !SharedData.start)
     ) {
       this.startWorkingShift(bar.time)
     }
 
     // Execute trade if this bar time was randomly selected
     if (this.startTimes.has(bar.time)) {
-      this.openDeal(bar.close, bar.time, bar.high, bar.low, bar.symbol)
+      DealManager.openDeal(bar.close, bar.time, bar.high, bar.low, bar.symbol)
     }
 
     // Process existing deals

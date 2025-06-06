@@ -1,25 +1,73 @@
+/**
+ * Grid Trading Bot Functions
+ *
+ * Core implementation of grid trading strategy logic including:
+ * - Grid order creation and management
+ * - Order size calculations with various scaling methods
+ * - Take profit and stop loss logic
+ * - Position management and balance calculations
+ * - Grid recreation and dynamic adjustment
+ *
+ * This class encapsulates all the business logic for grid trading bots,
+ * providing methods to create orders, calculate sizes, and manage the
+ * grid state throughout the trading session.
+ *
+ * Key Features:
+ * - Multiple order size calculation methods
+ * - Geometric and arithmetic grid spacing
+ * - Dynamic grid adjustment based on market conditions
+ * - Risk management through stop loss and take profit
+ * - Support for futures and spot trading
+ *
+ * @fileoverview Grid trading strategy implementation
+ */
+
 import { BotMarginTypeEnum, StrategyEnum, BotOrderSideEnum } from '../types'
 import BotUtils from './botUtils'
 
 import type { Settings, Symbols, Grid, OrderData } from '../types'
 
+/**
+ * Main grid trading bot functions class
+ *
+ * Handles all aspects of grid trading including order creation, sizing,
+ * and grid management for both spot and futures trading.
+ */
 class BotFunctions {
+  /** Mathematical utilities instance */
   private math: BotUtils['math']
 
+  /** Bot configuration settings */
   private settings: Settings
 
+  /** User's trading fee percentage */
   private userFee: number
 
+  /** Trading pair symbol information */
   private symbol: Symbols
 
+  /** Current market price */
   private latestPrice: number
 
+  /** Initial price when strategy started */
   private initialPrice: number
 
+  /** Force local calculations flag */
   public forceLocal = false
 
+  /** Bot utilities instance */
   utils: BotUtils
 
+  /**
+   * Creates a new BotFunctions instance
+   *
+   * @param settings - Grid trading strategy settings
+   * @param userFee - User's trading fee as decimal (e.g., 0.001 for 0.1%)
+   * @param symbol - Trading pair symbol information
+   * @param latestPrice - Current market price
+   * @param initialPrice - Starting price for the strategy
+   * @param tradesBacktest - Whether this is for backtesting
+   */
   constructor(
     settings: Settings,
     userFee: number,
@@ -37,6 +85,11 @@ class BotFunctions {
     this.math = this.utils.math
   }
 
+  /**
+   * Updates bot settings
+   *
+   * @param settings - Partial settings object to merge with current settings
+   */
   set sett(settings: Partial<Settings>) {
     this.settings = {
       ...this.settings,
@@ -44,36 +97,83 @@ class BotFunctions {
     }
   }
 
+  /**
+   * Updates user fee percentage
+   *
+   * @param userFee - New fee percentage as decimal
+   */
   set fee(userFee: number) {
     this.userFee = userFee
   }
 
+  /**
+   * Updates trading symbol
+   *
+   * @param symbol - New symbol information
+   */
   set sym(symbol: Symbols) {
     this.symbol = symbol
   }
 
+  /**
+   * Updates all core bot data at once
+   *
+   * @param data - Object containing settings, userFee, and symbol
+   */
   set all(data: { settings: Settings; userFee: number; symbol: Symbols }) {
     this.settings = data.settings
     this.userFee = data.userFee
     this.symbol = data.symbol
   }
 
+  /**
+   * Updates the current market price
+   *
+   * @param latestPrice - New current market price
+   */
   set lastPrice(latestPrice: number) {
     this.latestPrice = latestPrice
   }
 
+  /**
+   * Gets the current market price
+   *
+   * @returns Current market price
+   */
   get lastPrice() {
     return this.latestPrice
   }
 
+  /**
+   * Updates the initial strategy price
+   *
+   * @param initialPrice - New initial price for strategy calculations
+   */
   set initPrice(initialPrice: number) {
     this.initialPrice = initialPrice
   }
 
+  /**
+   * Gets the initial strategy price
+   *
+   * @returns Initial price when strategy started
+   */
   get initPrice() {
     return this.initialPrice
   }
 
+  /**
+   * Finds the closest grid orders to current price (orders-in-advance feature)
+   *
+   * When orders-in-advance is enabled, this method selects only the N closest
+   * grid orders to the current market price, rather than placing all possible
+   * grid orders. This helps focus trading activity around the current price.
+   *
+   * @param grids - Array of all possible grid orders
+   * @param latestPrice - Current market price
+   * @param n - Optional override for number of orders to select
+   * @returns Selected grid orders closest to current price
+   */
   findClosestGrids(grids: Grid[], latestPrice: number, n?: number) {
     if (
       (this.settings.ordersInAdvance && this.settings.useOrderInAdvance) ||
@@ -177,6 +277,24 @@ class BotFunctions {
     return prices
   }
 
+  /**
+   * Creates grid orders for the trading strategy
+   *
+   * This is the core method that generates all grid orders based on the strategy
+   * settings. It calculates order sizes, applies scaling factors, and creates
+   * buy/sell orders at the appropriate price levels.
+   *
+   * @param all - Whether to create all possible orders or limit based on settings
+   * @param nosplice - Whether to skip order filtering/reduction
+   * @param side - Primary order side to focus on (affects sizing calculations)
+   * @returns Array of grid orders ready for placement
+   *
+   * @example
+   * ```typescript
+   * const buyOrders = botFunctions.createOrders(false, false, BotOrderSideEnum.buy);
+   * const allOrders = botFunctions.createOrders(true, false, BotOrderSideEnum.buy);
+   * ```
+   */
   createOrders(all = false, nosplice = false, side: BotOrderSideEnum): Grid[] {
     const { settings, symbol, forceLocal, latestPrice, userFee, initialPrice } =
       this

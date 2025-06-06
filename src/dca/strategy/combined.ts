@@ -9,6 +9,11 @@ import type {
 import { timeIntervalMap, DirName } from '../../types'
 import { FileReader } from '../../helper/fileReader'
 import { DataProcessor } from '../../helper/dataProcessor'
+import { SharedData } from './helpers/SharedData'
+import { PortfolioManager } from './helpers/PortfolioManager'
+import { MathHelper } from 'src/helper/math'
+
+const math = new MathHelper()
 
 /**
  * CombinedStrategy orchestrates multiple strategies, running them in parallel
@@ -62,8 +67,8 @@ class CombinedStrategy extends Strategy implements StrategyInterface {
     this.fileName = fileName
 
     // Configure strategy execution mode
-    Strategy.fullResult = input.fullResult
-    Strategy.useFile =
+    SharedData.fullResult = input.fullResult
+    SharedData.useFile =
       input.useFile &&
       Boolean(
         typeof process !== 'undefined' &&
@@ -98,7 +103,7 @@ class CombinedStrategy extends Strategy implements StrategyInterface {
 
     await this.initializeTest(lowest)
 
-    if (Strategy.useFile) {
+    if (SharedData.useFile) {
       await this.processFileBasedData(
         start,
         end,
@@ -117,11 +122,11 @@ class CombinedStrategy extends Strategy implements StrategyInterface {
    * from strategy data and calculating execution steps.
    */
   private prepareTestParameters(_start: number, end: number) {
-    const data = [...Strategy.data].sort(
+    const data = [...SharedData.data].sort(
       (a, b) => timeIntervalMap[a.interval] - timeIntervalMap[b.interval],
     )
     const [lowest] = data
-    const start = Strategy.start || _start
+    const start = SharedData.start || _start
     let step = start !== 0 && end !== 0 ? (end - start) / 100 : 0
 
     if (step < timeIntervalMap[lowest?.interval ?? 'INTERVAL_1M']) {
@@ -135,8 +140,8 @@ class CombinedStrategy extends Strategy implements StrategyInterface {
    * Initializes the test environment and strategy state.
    */
   private async initializeTest(lowest: { interval: ExchangeIntervals }) {
-    Strategy.lowestInterval = lowest.interval
-    Strategy.interval = lowest.interval
+    SharedData.lowestInterval = lowest.interval
+    SharedData.interval = lowest.interval
     await this.preTest()
   }
 
@@ -167,7 +172,7 @@ class CombinedStrategy extends Strategy implements StrategyInterface {
 
     try {
       for await (const line of fileReader.readLines(filePath)) {
-        if (this._stop) {
+        if (SharedData._stop) {
           return
         }
 
@@ -194,7 +199,7 @@ class CombinedStrategy extends Strategy implements StrategyInterface {
           size,
         )
 
-        if (Strategy.lowestInterval === bar.interval) {
+        if (SharedData.lowestInterval === bar.interval) {
           last.set(bar.symbol, bar)
         }
 
@@ -221,7 +226,7 @@ class CombinedStrategy extends Strategy implements StrategyInterface {
     const last: Map<string, FullBar> = new Map()
 
     for (const bar of lowest.bar) {
-      if (this._stop) {
+      if (SharedData._stop) {
         return
       }
 
@@ -259,7 +264,7 @@ class CombinedStrategy extends Strategy implements StrategyInterface {
   ): boolean {
     const _current = current.get(bar.symbol) || start
     return (
-      Strategy.lowestInterval === bar.interval &&
+      SharedData.lowestInterval === bar.interval &&
       (_current === start || bar.time >= _current)
     )
   }
@@ -295,7 +300,7 @@ class CombinedStrategy extends Strategy implements StrategyInterface {
   ): number {
     return (
       ((end - start) / timeIntervalMap[lowest.interval]) *
-      this.settings.pair.length
+      SharedData.settings.pair.length
     )
   }
 
@@ -306,10 +311,10 @@ class CombinedStrategy extends Strategy implements StrategyInterface {
     last: Map<string, SavedBar | FullBar>,
   ): Promise<void> {
     for (const bar of last.values()) {
-      if (Strategy.portfolio.has(bar.time)) {
+      if (SharedData.portfolio.has(bar.time)) {
         continue
       }
-      this.checkPortfolio(bar.time, bar.close, bar.symbol)
+      PortfolioManager.checkPortfolio(bar.time, bar.close, bar.symbol)
       await this.yieldControl()
     }
   }
@@ -326,7 +331,7 @@ class CombinedStrategy extends Strategy implements StrategyInterface {
    */
   public async preTest(): Promise<void> {
     for (const s of this.strategies) {
-      if (this._stop) {
+      if (SharedData._stop) {
         return
       }
       await s.preTest()
@@ -349,8 +354,8 @@ class CombinedStrategy extends Strategy implements StrategyInterface {
     updateProgress?: (value: number, text: string) => void,
     _size?: number,
   ): Promise<void> {
-    if (interval === Strategy.lowestInterval) {
-      const size = _size || Strategy?.data?.[0]?.bar?.length || 0
+    if (interval === SharedData.lowestInterval) {
+      const size = _size || SharedData?.data?.[0]?.bar?.length || 0
       if (this.step === 0 && this.total === 0 && updateProgress) {
         updateProgress(
           0,
@@ -365,7 +370,7 @@ class CombinedStrategy extends Strategy implements StrategyInterface {
           this.total = size
         }
 
-        if (this.math.remainder(this.i, this.step) === 0) {
+        if (math.remainder(this.i, this.step) === 0) {
           await new Promise((resolve) => setTimeout(resolve, 15))
           updateProgress(
             this.i / this.total,
@@ -378,7 +383,7 @@ class CombinedStrategy extends Strategy implements StrategyInterface {
       }
     }
     for (const s of this.strategies) {
-      if (this._stop) {
+      if (SharedData._stop) {
         return
       }
       await s.processBar(checkPortfolio, b, interval)
@@ -409,7 +414,7 @@ class CombinedStrategy extends Strategy implements StrategyInterface {
     candles: { candle: FullBar[] | null; interval: ExchangeIntervals }[],
   ): void {
     for (const s of this.strategies) {
-      if (this._stop) {
+      if (SharedData._stop) {
         return
       }
       s.processTrade(trade, candles)

@@ -1,14 +1,80 @@
+/**
+ * Bot Trading Utilities and Helper Functions
+ *
+ * Provides core utility functions for trading bot operations including:
+ * - Mathematical calculations using MathHelper
+ * - Symbol precision handling and calculations
+ * - Grid price generation for trading strategies
+ * - Currency and asset precision management
+ * - Trading pair validation and formatting
+ *
+ * This class serves as a foundation for all bot function classes and
+ * provides consistent mathematical operations and symbol handling.
+ *
+ * @fileoverview Core bot utilities and precision calculations
+ */
+
 import { MathHelper } from './math'
 import { FuturesStrategyEnum, BotOrderSideEnum } from '../types'
-import type { Symbols, GridType, Grid, Currency } from '../types'
+import type {
+  Symbols,
+  GridType,
+  Grid,
+  Currency,
+  DCABotSettings,
+  Settings,
+} from '../types'
 
+/**
+ * Core utility class for trading bot operations
+ *
+ * Centralizes common functionality needed by all trading bots including
+ * mathematical operations, precision handling, and grid calculations.
+ */
 class BotUtils {
+  /** Mathematical helper instance for all calculations */
   public math: MathHelper
 
+  /**
+   * Creates a new BotUtils instance
+   *
+   * @param tradesBacktest - Whether this instance is used for backtesting (affects behavior)
+   */
   constructor(private tradesBacktest?: boolean) {
     this.math = new MathHelper()
   }
 
+  /**
+   * Determines if profit should be calculated in base currency
+   *
+   * Checks bot settings to determine the appropriate profit currency
+   * based on futures trading mode and user preferences.
+   *
+   * @param settings - Bot settings (DCA or Grid)
+   * @returns True if profit should be calculated in base currency
+   */
+  isProfitBase(settings: DCABotSettings | Settings): boolean {
+    return (
+      (settings.futures && settings.coinm) ||
+      (!settings.futures && settings.profitCurrency === 'base')
+    )
+  }
+
+  /**
+   * Gets precision settings for a trading symbol
+   *
+   * Calculates the decimal precision needed for base asset, quote asset,
+   * and price values based on the symbol's trading rules.
+   *
+   * @param symbol - Trading symbol information (optional)
+   * @returns Object with base, quote, and price precision values
+   *
+   * @example
+   * ```typescript
+   * const precision = botUtils.getPrecision(symbol);
+   * // { base: 8, quote: 8, price: 8 }
+   * ```
+   */
   getPrecision(symbol?: Symbols) {
     return {
       base: symbol ? this.getBaseAssetPrecision(symbol) : 8,
@@ -22,6 +88,15 @@ class BotUtils {
     }
   }
 
+  /**
+   * Calculates base asset precision from symbol step size
+   *
+   * Determines the number of decimal places needed for base asset quantities
+   * by analyzing the symbol's minimum step size and handling exponential notation.
+   *
+   * @param symbol - Trading symbol with step size information
+   * @returns Number of decimal places for base asset precision
+   */
   getBaseAssetPrecision(symbol: Symbols) {
     let use = `${symbol.baseAsset.step}`
     if (use.indexOf('e-') !== -1) {
@@ -40,6 +115,15 @@ class BotUtils {
     return use.indexOf('1') === 0 ? 0 : use.replace('0.', '').indexOf('1') + 1
   }
 
+  /**
+   * Generates a random ID string of specified length
+   *
+   * Creates random alphanumeric identifiers for orders, transactions,
+   * and other entities that need unique identification.
+   *
+   * @param length - Length of the ID string to generate
+   * @returns Random alphanumeric string
+   */
   id(length: number): string {
     let result = ''
     const characters =
@@ -51,6 +135,33 @@ class BotUtils {
     return result
   }
 
+  /**
+   * Generates buy and sell prices for grid trading strategy
+   *
+   * Creates a series of price levels for grid trading based on the specified
+   * price range, number of levels, and grid type (arithmetic vs geometric).
+   *
+   * @param params - Grid configuration parameters
+   * @param params.lowPrice - Lowest price in the grid
+   * @param params.topPrice - Highest price in the grid
+   * @param params.levels - Number of grid levels to create
+   * @param params.symbol - Trading symbol for precision
+   * @param params.sellDisplacement - Percentage displacement for sell orders
+   * @param params.gridType - Type of grid spacing ('arithmetic' or 'geometric')
+   * @returns Array of buy/sell price pairs for the grid
+   *
+   * @example
+   * ```typescript
+   * const prices = botUtils.getPrices({
+   *   lowPrice: 100,
+   *   topPrice: 200,
+   *   levels: 10,
+   *   symbol: symbol,
+   *   sellDisplacement: 1,
+   *   gridType: 'arithmetic'
+   * });
+   * ```
+   */
   getPrices({
     lowPrice,
     topPrice,
@@ -127,6 +238,16 @@ class BotUtils {
     return prices
   }
 
+  /**
+   * Calculates buy and sell order counts based on current price position
+   *
+   * Determines how many buy and sell orders should be placed above and below
+   * the current price, with logic to balance the grid appropriately.
+   *
+   * @param prices - Array of buy/sell price pairs from getPrices
+   * @param params - Configuration for count calculation
+   * @returns Object with sell/buy counts and filtered price arrays
+   */
   getSellBuyCount(
     prices: ReturnType<typeof this.getPrices>,
     {
@@ -176,6 +297,19 @@ class BotUtils {
     return { sellCount, buyCount, buys, sells }
   }
 
+  /**
+   * Finds the closest grid orders to current price for orders-in-advance feature
+   *
+   * When using orders-in-advance, this method selects the N closest grid orders
+   * to the current market price, allowing for more focused trading around the
+   * current price level rather than placing all grid orders.
+   *
+   * @param gridParams - Grid configuration parameters
+   * @param grids - Array of all possible grid orders
+   * @param latestPrice - Current market price
+   * @param n - Number of orders to select (overrides ordersInAdvance setting)
+   * @returns Object with selected grids and buy/sell counts
+   */
   findClosestGrids(
     {
       lowPrice,

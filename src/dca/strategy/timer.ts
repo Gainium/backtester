@@ -1,6 +1,8 @@
 import { Strategy, StrategyInterface } from './main'
 import type { StrategyInput } from './main'
 import type { DCABotSettings, FullBar, TradeResponse } from '../../types'
+import { SharedData } from './helpers/SharedData'
+import { DealManager } from './helpers/DealManager'
 
 /**
  * Time format validation for hodlAt setting (HH:MM or H:MM)
@@ -128,7 +130,7 @@ class TimerStrategy extends Strategy implements StrategyInterface {
    * @returns Promise that resolves when backtesting is complete
    */
   public async test(): Promise<void> {
-    const bars = Strategy.data?.[0]?.bar
+    const bars = SharedData.data?.[0]?.bar
     if (!bars?.length) {
       throw new Error('No market data available for backtesting')
     }
@@ -163,7 +165,7 @@ class TimerStrategy extends Strategy implements StrategyInterface {
     let nextScheduledTime = this.getOrInitializeNextScheduledTime(trade)
 
     if (trade.timestamp === nextScheduledTime) {
-      this.openDeal(
+      DealManager.openDeal(
         +trade.price,
         trade.timestamp,
         +trade.price,
@@ -174,7 +176,7 @@ class TimerStrategy extends Strategy implements StrategyInterface {
     }
 
     this.checkDeals(false, this.tradeToBar(trade))
-    Strategy.next.set(trade.symbol, nextScheduledTime)
+    SharedData.next.set(trade.symbol, nextScheduledTime)
   }
 
   /**
@@ -185,8 +187,8 @@ class TimerStrategy extends Strategy implements StrategyInterface {
    */
   private initializeWorkingShiftIfNeeded(timestamp: number): void {
     const shouldStart =
-      Strategy.workingShift.length === 0 &&
-      ((Strategy.start && timestamp >= Strategy.start) || !Strategy.start)
+      SharedData.workingShift.length === 0 &&
+      ((SharedData.start && timestamp >= SharedData.start) || !SharedData.start)
 
     if (shouldStart) {
       this.startWorkingShift(timestamp)
@@ -201,7 +203,7 @@ class TimerStrategy extends Strategy implements StrategyInterface {
    * @private
    */
   private getOrInitializeNextScheduledTime(trade: TradeResponse): number {
-    let next = Strategy.next.get(trade.symbol)
+    let next = SharedData.next.get(trade.symbol)
 
     if (!next || next === 0) {
       next = this.calculateInitialScheduledTime(trade.timestamp)
@@ -343,7 +345,7 @@ class TimerStrategy extends Strategy implements StrategyInterface {
       nextScheduledTime = this.calculateNextScheduledTime(nextScheduledTime)
     }
 
-    Strategy.next.set(bar.symbol, nextScheduledTime)
+    SharedData.next.set(bar.symbol, nextScheduledTime)
     await this.checkDeals(checkPortfolio, bar)
   }
 
@@ -355,7 +357,7 @@ class TimerStrategy extends Strategy implements StrategyInterface {
    * @private
    */
   private getOrInitializeNextScheduledTimeForBar(bar: FullBar): number {
-    let next = Strategy.next.get(bar.symbol)
+    let next = SharedData.next.get(bar.symbol)
 
     if (!next || next === 0) {
       next = this.calculateInitialScheduledTimeWithTimezone(bar.time)
@@ -404,7 +406,7 @@ class TimerStrategy extends Strategy implements StrategyInterface {
   private calculateMaxDealsPerSymbol(): number {
     const { useMulti, maxDealsPerPair } = this.settings
 
-    if (!useMulti || !Strategy.multi || !maxDealsPerPair) {
+    if (!useMulti || !SharedData.multi || !maxDealsPerPair) {
       return 1
     }
 
@@ -421,7 +423,7 @@ class TimerStrategy extends Strategy implements StrategyInterface {
    */
   private openMultipleDeals(bar: FullBar, dealCount: number): void {
     for (let i = 0; i < dealCount; i++) {
-      this.openDeal(bar.open, bar.time, bar.high, bar.low, bar.symbol)
+      DealManager.openDeal(bar.open, bar.time, bar.high, bar.low, bar.symbol)
     }
   }
 }

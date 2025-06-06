@@ -3,6 +3,9 @@ import { Strategy, StrategyInterface } from './main'
 import type { StrategyInput } from './main'
 
 import { TradeResponse, FullBar, DCABotSettings } from '../../types'
+import { DealManager } from './helpers/DealManager'
+import { SharedData } from './helpers/SharedData'
+import { PortfolioManager } from './helpers/PortfolioManager'
 
 /**
  * ASAP (As Soon As Possible) DCA Strategy
@@ -56,7 +59,7 @@ class ASAPStrategy extends Strategy implements StrategyInterface {
    * @returns Promise that resolves when backtesting is complete
    */
   public async test(): Promise<void> {
-    for (const bar of Strategy.data[0].bar) {
+    for (const bar of SharedData.data[0].bar) {
       await this.processBar(false, bar)
     }
   }
@@ -101,12 +104,13 @@ class ASAPStrategy extends Strategy implements StrategyInterface {
    */
   private handleFirstDeal(trade: TradeResponse): void {
     if (
-      Strategy.workingShift.length === 0 &&
-      ((Strategy.start && trade.timestamp >= Strategy.start) || !Strategy.start)
+      SharedData.workingShift.length === 0 &&
+      ((SharedData.start && trade.timestamp >= SharedData.start) ||
+        !SharedData.start)
     ) {
       this.startWorkingShift(trade.timestamp)
     }
-    this.openDeal(
+    DealManager.openDeal(
       +trade.price,
       trade.timestamp,
       +trade.price,
@@ -121,7 +125,7 @@ class ASAPStrategy extends Strategy implements StrategyInterface {
    * @param trade - Trade data for the new deal
    */
   private handleSubsequentDeal(trade: TradeResponse): void {
-    this.openDeal(
+    DealManager.openDeal(
       +trade.price,
       trade.timestamp,
       +trade.price,
@@ -147,7 +151,7 @@ class ASAPStrategy extends Strategy implements StrategyInterface {
         symbol: trade.symbol,
       },
       (price: number) =>
-        this.openDeal(
+        DealManager.openDeal(
           price,
           trade.timestamp,
           +trade.price,
@@ -165,8 +169,8 @@ class ASAPStrategy extends Strategy implements StrategyInterface {
    */
   private getDealsState() {
     return {
-      totalDeals: Strategy.getDealsCount(),
-      closedDeals: Strategy.getDealsCount('closed'),
+      totalDeals: DealManager.getDealsCount(),
+      closedDeals: DealManager.getDealsCount('closed'),
     }
   }
 
@@ -209,7 +213,7 @@ class ASAPStrategy extends Strategy implements StrategyInterface {
 
     // Check portfolio on new shifts
     if (newShift) {
-      this.checkPortfolio(bar.time, bar.close, bar.symbol)
+      PortfolioManager.checkPortfolio(bar.time, bar.close, bar.symbol)
     }
   }
 
@@ -220,7 +224,7 @@ class ASAPStrategy extends Strategy implements StrategyInterface {
    * @returns Configuration object for processing decisions
    */
   private getBarProcessingConfig() {
-    const multi = this.settings.useMulti && Strategy.multi
+    const multi = this.settings.useMulti && SharedData.multi
     const useDynamic = !!(
       this.settings.useDynamicPriceFilter &&
       this.settings.dynamicPriceFilterDeviation &&
@@ -251,9 +255,9 @@ class ASAPStrategy extends Strategy implements StrategyInterface {
    */
   private getSymbolDealsState(symbol: string) {
     return {
-      total: Strategy.getDealsCount(undefined, symbol),
-      closed: Strategy.getDealsCount('closed', symbol),
-      open: Strategy.getDealsCount('open', symbol),
+      total: DealManager.getDealsCount(undefined, symbol),
+      closed: DealManager.getDealsCount('closed', symbol),
+      open: DealManager.getDealsCount('open', symbol),
     }
   }
 
@@ -268,8 +272,11 @@ class ASAPStrategy extends Strategy implements StrategyInterface {
     bar: FullBar,
     config: ReturnType<typeof this.getBarProcessingConfig>,
   ): Promise<boolean> {
-    if ((Strategy.start && bar.time >= Strategy.start) || !Strategy.start) {
-      const newShift = Strategy.workingShift.length === 0
+    if (
+      (SharedData.start && bar.time >= SharedData.start) ||
+      !SharedData.start
+    ) {
+      const newShift = SharedData.workingShift.length === 0
 
       if (newShift) {
         this.startWorkingShift(bar.time)
@@ -319,7 +326,7 @@ class ASAPStrategy extends Strategy implements StrategyInterface {
 
     // Optimized loop - no array creation
     for (let i = 0; i < dealCount; i++) {
-      this.openDeal(bar.close, bar.time, bar.high, bar.low, bar.symbol)
+      DealManager.openDeal(bar.close, bar.time, bar.high, bar.low, bar.symbol)
     }
   }
 
@@ -334,8 +341,8 @@ class ASAPStrategy extends Strategy implements StrategyInterface {
     bar: FullBar,
   ): Promise<void> {
     await this.checkDeals(checkPortfolio, bar, (price: number) => {
-      this.openDeal(price, bar.time, bar.high, bar.low, bar.symbol)
-      if (Strategy.combo) {
+      DealManager.openDeal(price, bar.time, bar.high, bar.low, bar.symbol)
+      if (SharedData.combo) {
         this.checkDeals(false, bar)
       }
     })

@@ -20,17 +20,68 @@ import { checkNumber } from './utils'
 
 import type { DCABotSettings, Symbols, DCAGrid, Asset, Sizes } from '../types'
 
+/**
+ * @fileoverview DCA (Dollar Cost Averaging) Bot Functions Handler
+ *
+ * This class provides comprehensive functionality for DCA trading bots, including:
+ * - Order generation and validation for DCA strategies
+ * - Take profit and stop loss calculations
+ * - Grid order management and dynamic sizing
+ * - Indicator-based conditions and custom logic
+ * - Multi-TP (take profit) configurations
+ * - Volume and size calculations for different order types
+ * - Risk management and breakpoint handling
+ *
+ * The DCA strategy involves placing multiple buy orders at decreasing price levels
+ * to average down the entry price. This class handles all the complex calculations
+ * needed for backtesting and live trading DCA bots.
+ *
+ * @performance Critical performance considerations:
+ * - Order generation can be expensive for large grid counts
+ * - Indicator calculations may impact performance
+ * - Precision handling is crucial for accurate backtesting
+ *
+ * @author Gainium Development Team
+ * @since 1.0.0
+ */
 class DCABotFunctions {
+  /** Mathematical utilities for calculations */
   math: BotUtils['math']
 
+  /** DCA bot configuration settings */
   settings: DCABotSettings
 
+  /** Trading symbol information and constraints */
   symbol: Symbols
 
+  /** General bot utilities instance */
   utils: BotUtils
 
+  /** User's trading fee percentage */
   userFee: number
 
+  /**
+   * Creates a new DCA Bot Functions instance
+   *
+   * @param settings - DCA bot configuration including strategy parameters
+   * @param symbol - Trading symbol with precision and minimum amount constraints
+   * @param userFee - User's trading fee as a decimal (e.g., 0.001 for 0.1%)
+   * @param tradesBacktest - Optional flag for backtesting mode
+   *
+   * @example
+   * ```typescript
+   * const dcaBot = new DCABotFunctions(
+   *   {
+   *     useDca: true,
+   *     dcaOrdersCount: 5,
+   *     dcaOrderSizeType: OrderSizeTypeEnum.percent,
+   *     // ... other settings
+   *   },
+   *   symbolInfo,
+   *   0.001
+   * );
+   * ```
+   */
   constructor(
     settings: DCABotSettings,
     symbol: Symbols,
@@ -44,6 +95,16 @@ class DCABotFunctions {
     this.userFee = userFee
   }
 
+  /**
+   * Updates bot settings with partial configuration
+   *
+   * @param settings - Partial settings object to merge with existing settings
+   *
+   * @example
+   * ```typescript
+   * dcaBot.sett = { dcaOrdersCount: 10, tpPerc: 2.5 };
+   * ```
+   */
   set sett(settings: Partial<DCABotSettings>) {
     this.settings = {
       ...this.settings,
@@ -51,19 +112,59 @@ class DCABotFunctions {
     }
   }
 
+  /**
+   * Gets current bot settings
+   *
+   * @returns Complete DCA bot settings object
+   */
   get sett() {
     return this.settings
   }
 
+  /**
+   * Updates trading symbol information
+   *
+   * @param symbol - New symbol information with updated constraints
+   */
   set sym(symbol: Symbols) {
     this.symbol = symbol
   }
 
+  /**
+   * Updates both settings and symbol in a single operation
+   *
+   * @param data - Object containing both settings and symbol updates
+   *
+   * @example
+   * ```typescript
+   * dcaBot.all = {
+   *   settings: updatedSettings,
+   *   symbol: updatedSymbol
+   * };
+   * ```
+   */
   set all(data: { settings: DCABotSettings; symbol: Symbols }) {
     this.settings = data.settings
     this.symbol = data.symbol
   }
 
+  /**
+   * Determines if trailing take profit is enabled and properly configured
+   *
+   * @returns True if all trailing TP conditions are met:
+   *   - Take profit is enabled
+   *   - TP percentage is valid
+   *   - Trailing TP is enabled
+   *   - Trailing TP percentage is valid
+   *   - Multi-TP is disabled (trailing incompatible with multi-TP)
+   *
+   * @example
+   * ```typescript
+   * if (dcaBot.isTrailingTp) {
+   *   // Apply trailing take profit logic
+   * }
+   * ```
+   */
   get isTrailingTp() {
     const { trailingTp, trailingTpPerc, tpPerc, useTp, useMultiTp } =
       this.settings
@@ -76,11 +177,71 @@ class DCABotFunctions {
     )
   }
 
+  /**
+   * Determines if trailing stop loss is enabled and properly configured
+   *
+   * @returns True if all trailing SL conditions are met:
+   *   - Stop loss is enabled
+   *   - Trailing SL is enabled
+   *   - SL percentage is valid
+   *
+   * @example
+   * ```typescript
+   * if (dcaBot.isTrailingSl) {
+   *   // Apply trailing stop loss logic
+   * }
+   * ```
+   */
   get isTrailingSl() {
     const { trailingSl, slPerc, useSl } = this.settings
     return useSl && trailingSl && checkNumber(slPerc)
   }
 
+  /**
+   * Creates a complete set of DCA orders including base order, DCA orders, and TP/SL orders
+   *
+   * This is the core method that generates all orders for a DCA trading strategy.
+   * It handles complex order sizing, dynamic pricing, indicator conditions, and
+   * multi-take-profit configurations.
+   *
+   * @param usdPrice - Current USD price for USD-based sizing calculations
+   * @param inputLatestPrice - Current market price for the trading pair
+   * @param all - Whether to return all orders regardless of active order limits
+   * @param precOrderSize - Precise order size override (0 = use settings)
+   * @param breakpoints - Grid breakpoints for custom price levels
+   * @param balances - Current account balances for percentage-based sizing
+   * @param outsideSl - Whether position is outside stop loss range
+   * @param tpSlTargetFilled - Array of already filled TP/SL target IDs
+   * @param _updatedComboAdjustments - Flag for combo strategy adjustments
+   * @param fixSl - Fixed stop loss price override (0 = use settings)
+   * @param fixTp - Fixed take profit price override (0 = use settings)
+   * @param fixSize - Fixed order size override (0 = use settings)
+   * @param dcaArValues - Dynamic AR (Average Range) values for scaling
+   * @param sizes - Additional size adjustments for base/quote assets
+   *
+   * @returns Array of DCA grid orders with prices, quantities, and order types
+   *
+   * @performance This method performs extensive calculations and validations.
+   * For large grid counts or complex indicator conditions, consider caching
+   * results where possible.
+   *
+   * @example
+   * ```typescript
+   * const orders = dcaBot.createOrders(
+   *   50000,  // USD price
+   *   40000,  // Current BTC price
+   *   false,  // Not all orders
+   *   0,      // No size override
+   *   [],     // No breakpoints
+   *   balances,
+   *   false,  // Not outside SL
+   *   [],     // No filled targets
+   *   true,   // Updated adjustments
+   *   0, 0, 0, // No fixed values
+   *   []      // No AR values
+   * );
+   * ```
+   */
   createOrders(
     usdPrice: number,
     inputLatestPrice: number,
@@ -962,6 +1123,45 @@ class DCABotFunctions {
     return result
   }
 
+  /**
+   * Generates stop loss orders with temporary settings adjustments
+   *
+   * This method creates stop loss orders by temporarily modifying bot settings
+   * to enable SL functionality if needed, then restores original settings.
+   * It's primarily used for calculating SL orders with different parameters
+   * than the current bot configuration.
+   *
+   * @param usdPrice - Current USD price for USD-based calculations
+   * @param slPerc - Stop loss percentage to use (decimal, e.g., 0.05 for 5%)
+   * @param breakeven - Breakeven price for SL calculation
+   * @param all - Whether to generate all orders regardless of limits
+   * @param precOrderSize - Precise order size override
+   * @param breakpoints - Grid breakpoints for custom price levels
+   * @param balances - Current account balances
+   * @param outsideSl - Whether position is outside stop loss range
+   * @param tpSlTargetFilled - Array of already filled TP/SL target IDs
+   *
+   * @returns Array of stop loss orders only (filtered from complete order set)
+   *
+   * @note This method temporarily modifies bot settings and restores them
+   * after order generation. It ensures SL orders are generated even if
+   * the bot is not configured for stop losses.
+   *
+   * @example
+   * ```typescript
+   * const slOrders = dcaBot.getSLOrder(
+   *   50000,   // USD price
+   *   0.05,    // 5% stop loss
+   *   40000,   // Breakeven price
+   *   false,   // Not all orders
+   *   0,       // No size override
+   *   [],      // No breakpoints
+   *   balances,
+   *   false,   // Not outside SL
+   *   []       // No filled targets
+   * );
+   * ```
+   */
   getSLOrder(
     usdPrice: number,
     slPerc: number,
@@ -1029,4 +1229,13 @@ class DCABotFunctions {
   }
 }
 
+/**
+ * @exports DCABotFunctions
+ * Main class for DCA (Dollar Cost Averaging) bot functionality.
+ *
+ * This class encapsulates all the complex logic needed for DCA trading strategies
+ * including order generation, risk management, and dynamic pricing calculations.
+ * It integrates with various market conditions, indicators, and user preferences
+ * to create optimal trading grids for backtesting and live trading.
+ */
 export default DCABotFunctions

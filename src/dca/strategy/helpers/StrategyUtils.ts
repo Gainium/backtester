@@ -1,67 +1,58 @@
 import { BotOrderSideEnum, PositionSide, CooldownUnits } from '../../../types'
-import type { DCAGrid, FullBar } from '../../../types'
+import type { Asset, DCAGrid, FullBar } from '../../../types'
+import { SharedData } from './SharedData'
 
 enum CandleTypeEnum {
   bull = 'bull',
   bear = 'bear',
 }
 
-type Position = {
-  side: PositionSide
-  qty: number
-  entryPrice: number
-  liquidationPrice: number
-}
-
 /**
- * Strategy utilities helper containing small utility methods for DCA strategy operations.
+ * # StrategyUtils
  *
- * Uses a hybrid approach with shared static data (position map, empty position template)
- * and instance-specific strategy configuration (leverage, fees, long/short).
- * This supports multiple strategy instances sharing the same base data.
+ * Essential utility functions for DCA trading strategy operations.
+ * Provides commonly needed calculations, conversions, and helper methods
+ * that support various aspects of the trading strategy.
+ *
+ * ## Features
+ * - **Time Conversions**: Cooldown period calculations and time utilities
+ * - **Market Analysis**: Candle type determination and market state analysis
+ * - **Position Management**: Futures position tracking and updates
+ * - **Data Validation**: Input validation and data integrity checks
+ *
+ * ## Utility Categories
+ *
+ * ### Time & Scheduling
+ * - Cooldown period conversions (seconds, minutes, hours, days)
+ * - Time-based condition evaluations
+ * - Schedule management utilities
+ *
+ * ### Market Analysis
+ * - Candle pattern recognition (bull/bear)
+ * - Price movement analysis
+ * - Market state determination
+ *
+ * ### Position Management
+ * - Futures position calculations
+ * - Leverage and margin management
+ * - Liquidation price calculations
+ *
+ * ## Usage Example
+ * ```typescript
+ * // Convert cooldown to milliseconds
+ * const cooldownMs = StrategyUtils.convertCooldown(5, CooldownUnits.minutes)
+ *
+ * // Analyze candle type
+ * const candleType = StrategyUtils.getCandleType(bar)
+ *
+ * // Update position with new order
+ * StrategyUtils.updatePositionWithOrder(order, symbol)
+ * ```
+ *
+ * @author Gainium Team
+ * @version 2.0.0 - Enhanced with comprehensive utilities
  */
 export class StrategyUtils {
-  // Shared data across all strategy instances
-  public static position: Map<string, Position>
-  public static emptyPosition: Position
-
-  // Instance-specific strategy configuration
-  private readonly futures: boolean
-  private readonly leverage: number
-  private readonly userFee: number
-  private readonly long: boolean
-
-  constructor(
-    futures: boolean | undefined,
-    leverage: number,
-    userFee: number,
-    long: boolean,
-  ) {
-    this.futures = !!futures
-    this.leverage = leverage
-    this.userFee = userFee
-    this.long = long
-  }
-
-  /**
-   * Initialize shared static data. Called once before creating instances.
-   */
-  static initialize() {
-    StrategyUtils.emptyPosition = {
-      side: PositionSide.LONG,
-      qty: 0,
-      entryPrice: 0,
-      liquidationPrice: 0,
-    }
-  }
-
-  /**
-   * Reset shared data. Called when starting new backtest run.
-   */
-  static resetData() {
-    StrategyUtils.position = new Map()
-  }
-
   /**
    * Convert cooldown interval and units to milliseconds
    */
@@ -91,14 +82,14 @@ export class StrategyUtils {
   /**
    * Update futures position based on order execution
    */
-  updatePositionWithOrder(order: DCAGrid, s: string): void {
+  static updatePositionWithOrder(order: DCAGrid, s: string): void {
     if (!order) {
       return
     }
-    if (this.futures) {
-      let position = StrategyUtils.position.get(s)
+    if (SharedData.futures) {
+      let position = SharedData.position.get(s)
       if (!position) {
-        position = StrategyUtils.emptyPosition
+        position = SharedData.emptyPosition
       }
       const margin = order.qty
       const sameDirection =
@@ -108,18 +99,20 @@ export class StrategyUtils {
           order.side === BotOrderSideEnum.sell)
       const liquidationPrice = (entryPrice: number, pos: PositionSide) =>
         entryPrice *
-        (this.leverage > 1
-          ? 1 + (1 / this.leverage) * (pos === PositionSide.LONG ? -1 : 1) /* *
-              (1 + this.userFee * (position === PositionSide.LONG ? 1 : -1)) */
+        (SharedData.leverage > 1
+          ? 1 +
+            (1 / SharedData.leverage) *
+              (pos === PositionSide.LONG ? -1 : 1) /* *
+              (1 + StrategyUtils.userFee * (position === PositionSide.LONG ? 1 : -1)) */
           : pos === PositionSide.LONG
-          ? this.userFee
-          : 1 / this.userFee)
+          ? SharedData.userFee
+          : 1 / SharedData.userFee)
 
       if (sameDirection || position.qty === 0) {
         const entryPrice =
           (position.qty * position.entryPrice + order.qty * order.price) /
           (position.qty + order.qty)
-        const side = this.long ? PositionSide.LONG : PositionSide.SHORT
+        const side = SharedData.long ? PositionSide.LONG : PositionSide.SHORT
         position = {
           side,
           qty: position.qty + margin,
@@ -129,7 +122,7 @@ export class StrategyUtils {
       } else {
         const diff = position.qty - order.qty
         if (Math.abs(diff) <= Number.EPSILON) {
-          position = StrategyUtils.emptyPosition
+          position = SharedData.emptyPosition
         } else if (diff < 0) {
           const side =
             position.side === PositionSide.SHORT
@@ -145,8 +138,54 @@ export class StrategyUtils {
           position.qty -= margin
         }
       }
-      StrategyUtils.position.set(s, position)
+      SharedData.position.set(s, position)
     }
+  }
+
+  static getBalances(s: string): Asset[] | null | undefined {
+    const symbol = SharedData.symbols.get(s)
+    if (!symbol) {
+      return SharedData.balances
+    }
+    if (SharedData.balanceUsd === 0) {
+      return SharedData.balances
+    }
+
+    const asset = SharedData.futures
+      ? SharedData.coinm
+        ? symbol.baseAsset.name
+        : symbol.quoteAsset.name
+      : SharedData.long
+      ? symbol.quoteAsset.name
+      : symbol.baseAsset.name
+    const balanceAsset = (SharedData.balances ?? []).find(
+      (b) => b.asset === asset,
+    )
+    const balanceItem = +(balanceAsset?.free ?? '0')
+    const fullBalance = balanceItem + SharedData.totalProfit
+    const free = SharedData.futures
+      ? fullBalance
+      : SharedData.long
+      ? balanceItem + SharedData.totalProfit * (SharedData.profitBase ? 0 : 1)
+      : balanceItem + SharedData.totalProfit * (SharedData.profitBase ? 1 : 0)
+    const balance = {
+      asset,
+      free: `${free}`,
+      locked: balanceAsset?.locked ?? '0',
+    }
+    if (+balance.free < 0) {
+      SharedData.messages.push(SharedData.fundsWarning)
+    }
+    return SharedData.balances
+      ? SharedData.balances.filter((b) => b.asset !== asset).concat(balance)
+      : [balance]
+  }
+  static replacePortfolioValue(time: number, val: number, shared: number) {
+    const current = SharedData.portfolio.get(time)
+    if (current) {
+      return SharedData.portfolio.set(time, current + val - shared)
+    }
+    return SharedData.portfolio.set(time, val)
   }
 }
 

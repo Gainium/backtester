@@ -15,7 +15,86 @@ import {
 } from '../types'
 import DcaBotFunctions from './dcaBotFunctions'
 
+/**
+ * @fileoverview Combo Bot Functions Handler
+ *
+ * This class extends DCABotFunctions to provide specialized functionality for
+ * Combo trading strategies. Combo bots combine grid and DCA strategies to create
+ * more sophisticated trading patterns.
+ *
+ * Key differences from standard DCA bots:
+ * - Modified order generation logic for grid-DCA combinations
+ * - Different base order and step calculations
+ * - Enhanced support for futures and margin trading
+ * - Specialized handling of order sizing and scaling
+ * - Optimized for both long and short grid strategies
+ *
+ * The combo strategy creates a grid of orders both above and below the current price,
+ * allowing for profit taking on both upward and downward price movements while
+ * maintaining the DCA averaging-down (or up) principle.
+ *
+ * @performance Combo bots can generate more orders than standard DCA bots,
+ * which may impact performance during backtesting with large datasets.
+ *
+ * @author Gainium Development Team
+ * @extends DCABotFunctions
+ * @since 1.0.0
+ */
 class ComboBotFunctions extends DcaBotFunctions {
+  /**
+   * Creates orders for Combo trading strategies (Grid + DCA combination)
+   *
+   * This method overrides the parent DCA createOrders to implement combo-specific
+   * order generation logic. It creates both grid orders (for taking profits)
+   * and DCA orders (for averaging down/up) in a single cohesive strategy.
+   *
+   * Key differences from parent implementation:
+   * - Creates grid orders above and below current price
+   * - Uses different step calculations (baseStep vs step)
+   * - Enhanced futures and margin trading support
+   * - Different order sizing logic for grid vs DCA portions
+   * - Specialized handling for both long and short strategies
+   *
+   * @param usdPrice - Current USD price for USD-based sizing calculations
+   * @param inputLatestPrice - Current market price for the trading pair
+   * @param all - Whether to return all orders regardless of active order limits
+   * @param precOrderSize - Precise order size override (0 = use settings)
+   * @param breakpoints - Grid breakpoints for custom price levels
+   * @param balances - Current account balances for percentage-based sizing
+   * @param outsideSl - Whether position is outside stop loss range
+   * @param _tpSlTargetFilled - Array of already filled TP/SL target IDs (unused in combo)
+   * @param updatedComboAdjustments - Whether combo-specific adjustments have been updated
+   * @param _fixSl - Fixed stop loss price override (unused in combo)
+   * @param _fixTp - Fixed take profit price override (unused in combo)
+   * @param _fixSize - Fixed order size override (unused in combo)
+   * @param _dcaArValues - Dynamic AR values for scaling (unused in combo)
+   * @param sizes - Additional size adjustments for base/quote assets
+   *
+   * @returns Array of combo grid orders including both grid and DCA components
+   *
+   * @override
+   * @performance This method can generate more orders than standard DCA,
+   * especially for large grid counts. Consider limiting grid size for
+   * performance-critical applications.
+   *
+   * @example
+   * ```typescript
+   * const comboBot = new ComboBotFunctions(settings, symbol, userFee);
+   * const orders = comboBot.createOrders(
+   *   50000,  // USD price
+   *   40000,  // Current price
+   *   false,  // Not all orders
+   *   0,      // No size override
+   *   [],     // No breakpoints
+   *   balances,
+   *   false,  // Not outside SL
+   *   [],     // No filled targets
+   *   true,   // Updated adjustments
+   *   0, 0, 0, // Unused parameters
+   *   []      // No AR values
+   * );
+   * ```
+   */
   override createOrders(
     usdPrice: number,
     inputLatestPrice: number,
@@ -714,4 +793,13 @@ class ComboBotFunctions extends DcaBotFunctions {
   }
 }
 
+/**
+ * @exports ComboBotFunctions
+ * Main class for Combo (Grid + DCA) bot functionality.
+ *
+ * This class provides specialized order generation for combo trading strategies
+ * that combine the benefits of grid trading (profit-taking on price swings)
+ * with DCA strategies (position averaging). It extends the base DCA functionality
+ * with grid-specific enhancements for more sophisticated trading patterns.
+ */
 export default ComboBotFunctions

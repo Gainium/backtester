@@ -87,7 +87,7 @@ import type {
   FullBar,
   SettingsIndicatorGroup,
 } from '../../../types'
-import type { DataType, StrategyInput } from '../main'
+import type { StrategyInput } from '../main'
 import {
   DIVResult,
   PCResult,
@@ -96,6 +96,11 @@ import {
   QFLResult,
   SuperTrendResult,
 } from '@gainium/indicators'
+import { DealManager } from '../helpers/DealManager'
+import { DataType, SharedData } from '../helpers/SharedData'
+import { MathHelper } from 'src/helper/math'
+
+const math = new MathHelper()
 
 /**
  * Status tracking for indicator signals
@@ -248,52 +253,56 @@ class TIStrategy extends Strategy implements StrategyInterface {
           kcRangeLength,
         } = i
         const scaleAr =
-          (this.settings.dcaCondition === DCAConditionEnum.percentage ||
-            !this.settings.dcaCondition) &&
+          (SharedData.settings.dcaCondition === DCAConditionEnum.percentage ||
+            !SharedData.settings.dcaCondition) &&
           [ScaleDcaTypeEnum.adr, ScaleDcaTypeEnum.atr].includes(
-            this.settings.scaleDcaType ?? ScaleDcaTypeEnum.percentage,
+            SharedData.settings.scaleDcaType ?? ScaleDcaTypeEnum.percentage,
           ) &&
-          this.settings.useDca &&
+          SharedData.settings.useDca &&
           indicatorAction === IndicatorAction.startDca
         const tpAr =
           indicatorAction === IndicatorAction.closeDeal &&
           section !== IndicatorSection.sl &&
-          this.settings.dealCloseCondition === CloseConditionEnum.dynamicAr &&
-          this.settings.useTp
+          SharedData.settings.dealCloseCondition ===
+            CloseConditionEnum.dynamicAr &&
+          SharedData.settings.useTp
         const slAr =
           indicatorAction === IndicatorAction.closeDeal &&
           section === IndicatorSection.sl &&
-          this.settings.dealCloseConditionSL === CloseConditionEnum.dynamicAr &&
-          this.settings.useSl
+          SharedData.settings.dealCloseConditionSL ===
+            CloseConditionEnum.dynamicAr &&
+          SharedData.settings.useSl
         if (
-          (this.settings.startCondition !== StartConditionEnum.ti &&
+          (SharedData.settings.startCondition !== StartConditionEnum.ti &&
             indicatorAction === IndicatorAction.startDeal) ||
-          (!this.settings.useRiskReward &&
+          (!SharedData.settings.useRiskReward &&
             indicatorAction === IndicatorAction.riskReward) ||
-          ((!this.settings.useTp ||
-            (this.settings.dealCloseCondition !== CloseConditionEnum.techInd &&
-              this.settings.dealCloseCondition !==
+          ((!SharedData.settings.useTp ||
+            (SharedData.settings.dealCloseCondition !==
+              CloseConditionEnum.techInd &&
+              SharedData.settings.dealCloseCondition !==
                 CloseConditionEnum.dynamicAr)) &&
             indicatorAction === IndicatorAction.closeDeal &&
             section !== IndicatorSection.sl) ||
-          ((!this.settings.useSl ||
-            (this.settings.dealCloseConditionSL !==
+          ((!SharedData.settings.useSl ||
+            (SharedData.settings.dealCloseConditionSL !==
               CloseConditionEnum.techInd &&
-              this.settings.dealCloseConditionSL !==
+              SharedData.settings.dealCloseConditionSL !==
                 CloseConditionEnum.dynamicAr)) &&
             indicatorAction === IndicatorAction.closeDeal &&
             section === IndicatorSection.sl) ||
-          ((!this.settings.useDca ||
+          ((!SharedData.settings.useDca ||
             !(
-              this.settings.dcaCondition === DCAConditionEnum.indicators ||
-              scaleAr
+              SharedData.settings.dcaCondition ===
+                DCAConditionEnum.indicators || scaleAr
             )) &&
             indicatorAction === IndicatorAction.startDca) ||
-          ((!this.settings.useBotController ||
-            this.settings.botStart !== BotStartTypeEnum.indicators) &&
+          ((!SharedData.settings.useBotController ||
+            SharedData.settings.botStart !== BotStartTypeEnum.indicators) &&
             indicatorAction === IndicatorAction.stopBot) ||
-          ((!this.settings.useBotController ||
-            this.settings.botActualStart !== BotStartTypeEnum.indicators) &&
+          ((!SharedData.settings.useBotController ||
+            SharedData.settings.botActualStart !==
+              BotStartTypeEnum.indicators) &&
             indicatorAction === IndicatorAction.startBot)
         ) {
           continue
@@ -533,7 +542,7 @@ class TIStrategy extends Strategy implements StrategyInterface {
                 percentilePercentage,
               } as IndicatorConfigBackTesting),
         )
-        Strategy.indicators.push({
+        SharedData.indicators.push({
           instance: ind,
           data: [],
           id: `${uuid}@${s.pair}`,
@@ -565,7 +574,7 @@ class TIStrategy extends Strategy implements StrategyInterface {
             maType: maCrossingValue,
             interval: maCrossingLength,
           })
-          Strategy.indicators.push({
+          SharedData.indicators.push({
             instance: indicatorChild,
             data: [],
             id: `${maUUID}@${s.pair}`,
@@ -600,7 +609,7 @@ class TIStrategy extends Strategy implements StrategyInterface {
                   interval: xOscillator2length || indicatorLength,
                 },
           )
-          Strategy.indicators.push({
+          SharedData.indicators.push({
             instance: indicatorChild,
             data: [],
             id: `${xoUUID}@${s.pair}`,
@@ -617,8 +626,8 @@ class TIStrategy extends Strategy implements StrategyInterface {
     }
     this.updateIndicatorData = this.updateIndicatorData.bind(this)
     this.checkIndicators = this.checkIndicators.bind(this)
-    Strategy.lowestInterval = Strategy.interval
-    Strategy.highestInterval = input.settings.indicators
+    SharedData.lowestInterval = SharedData.interval
+    SharedData.highestInterval = input.settings.indicators
       .filter((i) => i.indicatorAction === IndicatorAction.startDeal)
       .map((i) => i.indicatorInterval)
       .sort((a, b) => timeIntervalMap[b] - timeIntervalMap[a])?.[0]
@@ -628,7 +637,7 @@ class TIStrategy extends Strategy implements StrategyInterface {
     interval: ExchangeIntervals
     countBack: number
   }[] {
-    const intervals = Strategy.indicators.flatMap((i) => {
+    const intervals = SharedData.indicators.flatMap((i) => {
       const int = [
         {
           interval: i.settings.indicatorInterval,
@@ -659,10 +668,10 @@ class TIStrategy extends Strategy implements StrategyInterface {
     })
 
     if (
-      Strategy.lowestInterval &&
-      !intervals.map((i) => i.interval).includes(Strategy.lowestInterval)
+      SharedData.lowestInterval &&
+      !intervals.map((i) => i.interval).includes(SharedData.lowestInterval)
     ) {
-      intervals.push({ interval: Strategy.lowestInterval, countBack: 0 })
+      intervals.push({ interval: SharedData.lowestInterval, countBack: 0 })
     }
     return intervals
   }
@@ -678,12 +687,12 @@ class TIStrategy extends Strategy implements StrategyInterface {
    * @returns Promise that resolves when the test is complete
    */
   public async test(): Promise<void> {
-    const data = [...Strategy.data].sort(
+    const data = [...SharedData.data].sort(
       (a, b) => timeIntervalMap[a.interval] - timeIntervalMap[b.interval],
     )
     const [lowest] = data
-    Strategy.lowestInterval = lowest.interval
-    Strategy.interval = lowest.interval
+    SharedData.lowestInterval = lowest.interval
+    SharedData.interval = lowest.interval
     for (const b of lowest.bar) {
       await this.processBar(false, b)
     }
@@ -701,7 +710,7 @@ class TIStrategy extends Strategy implements StrategyInterface {
    */
   public async preTest(): Promise<void> {
     if (this.lowestData.length === 0) {
-      this.lowestData = [...Strategy.data].sort(
+      this.lowestData = [...SharedData.data].sort(
         (a, b) => timeIntervalMap[b.interval] - timeIntervalMap[a.interval],
       )
     }
@@ -718,7 +727,7 @@ class TIStrategy extends Strategy implements StrategyInterface {
    * @param time - Current timestamp for status validation
    */
   private checkStatuses(time: number) {
-    Strategy.indicators = Strategy.indicators.map((i) => {
+    SharedData.indicators = SharedData.indicators.map((i) => {
       const findStatus = i.statuses.find(
         (s) => time >= s.statusSince && time < s.statusTo,
       )
@@ -759,20 +768,21 @@ class TIStrategy extends Strategy implements StrategyInterface {
     candles: { candle: FullBar[] | null; interval: ExchangeIntervals }[],
   ): void {
     if (
-      Strategy.workingShift.length === 0 &&
-      ((Strategy.start && trade.timestamp >= Strategy.start) || !Strategy.start)
+      SharedData.workingShift.length === 0 &&
+      ((SharedData.start && trade.timestamp >= SharedData.start) ||
+        !SharedData.start)
     ) {
       this.startWorkingShift(trade.timestamp)
     }
     this.checkStatuses(trade.timestamp)
-    this.checkInRange(trade.symbol, +trade.price, trade.timestamp)
+    DealManager.checkInRange(trade.symbol, +trade.price, trade.timestamp)
     if (candles.length) {
       for (const c of candles) {
         if (!c.candle) {
           continue
         }
 
-        const indicator = Strategy.indicators.find(
+        const indicator = SharedData.indicators.find(
           (i) =>
             i.interval === c.interval && i.symbol === c.candle?.[0]?.symbol,
         )
@@ -790,7 +800,7 @@ class TIStrategy extends Strategy implements StrategyInterface {
               this.updateIndicatorData(indicator),
             )
           }
-          const isProcess = _c.time >= Strategy.start
+          const isProcess = _c.time >= SharedData.start
           if (!isProcess) {
             continue
           }
@@ -835,17 +845,17 @@ class TIStrategy extends Strategy implements StrategyInterface {
     interval?: ExchangeIntervals,
   ): Promise<void> {
     if (
-      Strategy.workingShift.length === 0 &&
-      ((Strategy.start && bar.time >= Strategy.start) || !Strategy.start)
+      SharedData.workingShift.length === 0 &&
+      ((SharedData.start && bar.time >= SharedData.start) || !SharedData.start)
     ) {
       this.startWorkingShift(bar.time)
     }
     this.checkStatuses(bar.time)
-    this.checkInRange(bar.symbol, bar.close, bar.time)
+    DealManager.checkInRange(bar.symbol, bar.close, bar.time)
     let hasLowest = false
     let hasRest = false
-    if (Strategy.useFile && interval) {
-      for (const i of Strategy.indicators.filter(
+    if (SharedData.useFile && interval) {
+      for (const i of SharedData.indicators.filter(
         (_i) => _i.interval === interval && _i.symbol === bar.symbol,
       )) {
         i.instance.updateValue(
@@ -861,14 +871,14 @@ class TIStrategy extends Strategy implements StrategyInterface {
         )
       }
     } else {
-      const lowestIndicators = Strategy.indicators.filter(
+      const lowestIndicators = SharedData.indicators.filter(
         (i) =>
-          i.interval === Strategy.lowestInterval && i.symbol === bar.symbol,
+          i.interval === SharedData.lowestInterval && i.symbol === bar.symbol,
       )
       hasLowest = lowestIndicators.length > 0
-      const restIndicators = Strategy.indicators.filter(
+      const restIndicators = SharedData.indicators.filter(
         (i) =>
-          i.interval !== Strategy.lowestInterval && i.symbol === bar.symbol,
+          i.interval !== SharedData.lowestInterval && i.symbol === bar.symbol,
       )
       for (const i of lowestIndicators) {
         i.instance.updateValue(
@@ -886,7 +896,7 @@ class TIStrategy extends Strategy implements StrategyInterface {
       const range = [
         bar.time + 1,
         bar.time +
-          timeIntervalMap[Strategy.lowestInterval ?? Strategy.interval],
+          timeIntervalMap[SharedData.lowestInterval ?? SharedData.interval],
       ]
       for (const i of restIndicators) {
         const nextBarTime = this.nextBarTime.get(i.id)
@@ -896,7 +906,7 @@ class TIStrategy extends Strategy implements StrategyInterface {
         ) {
           continue
         }
-        const _data = Strategy.dataMap.get(i.interval)
+        const _data = SharedData.dataMap.get(i.interval)
         if (_data) {
           const data = Array.from(_data.values())
           let bars: FullBar[] = []
@@ -939,24 +949,24 @@ class TIStrategy extends Strategy implements StrategyInterface {
         }
       }
     }
-    let isProcess = bar.time >= Strategy.start
-    if (Strategy.useFile) {
-      isProcess = isProcess && interval === Strategy.lowestInterval
+    let isProcess = bar.time >= SharedData.start
+    if (SharedData.useFile) {
+      isProcess = isProcess && interval === SharedData.lowestInterval
     }
     if (!isProcess) {
       return
     }
 
-    if (this.nextAction || Strategy.useFile) {
+    if (this.nextAction || SharedData.useFile) {
       this.checkIndicators(bar)
     }
 
     this.nextAction = hasLowest || hasRest
 
     await this.checkDeals(checkPortfolio, bar, (price: number) => {
-      if (this.settings.startCondition === StartConditionEnum.asap) {
-        this.openDeal(price, bar.time, bar.high, bar.low, bar.symbol)
-        if (Strategy.combo) {
+      if (SharedData.settings.startCondition === StartConditionEnum.asap) {
+        DealManager.openDeal(price, bar.time, bar.high, bar.low, bar.symbol)
+        if (SharedData.combo) {
           this.checkDeals(false, bar)
         }
       }
@@ -984,13 +994,13 @@ class TIStrategy extends Strategy implements StrategyInterface {
       i.data = d
 
       // Efficiently update the indicators array
-      const existingIndex = Strategy.indicators.findIndex(
+      const existingIndex = SharedData.indicators.findIndex(
         (ii) => ii.id === i.id,
       )
       if (existingIndex !== -1) {
-        Strategy.indicators[existingIndex] = i
+        SharedData.indicators[existingIndex] = i
       } else {
-        Strategy.indicators.push(i)
+        SharedData.indicators.push(i)
       }
 
       // Clean up old cache entries to prevent memory leaks
@@ -1014,16 +1024,16 @@ class TIStrategy extends Strategy implements StrategyInterface {
   private checkIndicators(nextBar: FullBar) {
     // Performance optimization: categorize indicators in a single pass
     const indicatorCategories = {
-      start: [] as typeof Strategy.indicators,
-      close: [] as typeof Strategy.indicators,
-      dca: [] as typeof Strategy.indicators,
-      stop: [] as typeof Strategy.indicators,
-      botStart: [] as typeof Strategy.indicators,
-      risk: [] as typeof Strategy.indicators,
+      start: [] as typeof SharedData.indicators,
+      close: [] as typeof SharedData.indicators,
+      dca: [] as typeof SharedData.indicators,
+      stop: [] as typeof SharedData.indicators,
+      botStart: [] as typeof SharedData.indicators,
+      risk: [] as typeof SharedData.indicators,
     }
 
     // Single pass categorization instead of multiple filter operations
-    for (const indicator of Strategy.indicators) {
+    for (const indicator of SharedData.indicators) {
       switch (indicator.settings.indicatorAction) {
         case IndicatorAction.startDeal:
           indicatorCategories.start.push(indicator)
@@ -1054,15 +1064,18 @@ class TIStrategy extends Strategy implements StrategyInterface {
     const botStartIndicators = indicatorCategories.botStart
     const riskIndicators = indicatorCategories.risk
     if (
-      this.settings.useRiskReward &&
-      this.settings.startCondition === StartConditionEnum.asap &&
-      !this.settings.useStaticPriceFilter &&
-      !this.settings.useDynamicPriceFilter &&
+      SharedData.settings.useRiskReward &&
+      SharedData.settings.startCondition === StartConditionEnum.asap &&
+      !SharedData.settings.useStaticPriceFilter &&
+      !SharedData.settings.useDynamicPriceFilter &&
       riskIndicators.filter((i) => i.data.length > 0).length
     ) {
-      const dealsPerSymbols = Strategy.getDealsCount(undefined, nextBar.symbol)
+      const dealsPerSymbols = DealManager.getDealsCount(
+        undefined,
+        nextBar.symbol,
+      )
       if (!dealsPerSymbols) {
-        this.openDeal(
+        DealManager.openDeal(
           nextBar.open,
           nextBar.time,
           nextBar.high,
@@ -1075,22 +1088,22 @@ class TIStrategy extends Strategy implements StrategyInterface {
       (startIndicators.filter((i) => i.data.length > 0).length ||
         closeIndicators.filter((i) => i.data.length > 0).length ||
         (stopIndicators.filter((i) => i.data.length > 0).length &&
-          Strategy.status === 'open' &&
-          !Strategy.preventOpen) ||
+          SharedData.status === 'open' &&
+          !SharedData.preventOpen) ||
         dcaIndicators.filter((i) => i.data.length > 0).length ||
         (botStartIndicators.filter((i) => i.data.length > 0).length &&
-          Strategy.preventOpen &&
-          Strategy.status === 'monitoring')) &&
+          SharedData.preventOpen &&
+          SharedData.status === 'monitoring')) &&
       nextBar
     ) {
-      const currentState = [...Strategy.indicators].filter(
+      const currentState = [...SharedData.indicators].filter(
         (i) =>
           i.id !== `${i.settings.maUUID}@${nextBar.symbol}` &&
           `${i.settings.xoUUID}@${nextBar.symbol}` &&
           i.data.length > 0 &&
           i.symbol === nextBar.symbol,
       )
-      //Strategy.indicators = Strategy.indicators.map((i) => ({ ...i, data: [] }))
+      //SharedData.indicators = SharedData.indicators.map((i) => ({ ...i, data: [] }))
       for (const i of currentState) {
         let action = false
         let skipAction = false
@@ -1134,16 +1147,16 @@ class TIStrategy extends Strategy implements StrategyInterface {
         } = i
         if (
           indicatorAction === IndicatorAction.riskReward &&
-          Strategy.indicators.length > this.settings.pair.length
+          SharedData.indicators.length > SharedData.settings.pair.length
         ) {
           continue
         }
         if (
           indicatorAction === IndicatorAction.startDca &&
-          (this.settings.dcaCondition === DCAConditionEnum.percentage ||
-            !this.settings.dcaCondition) &&
+          (SharedData.settings.dcaCondition === DCAConditionEnum.percentage ||
+            !SharedData.settings.dcaCondition) &&
           [ScaleDcaTypeEnum.adr, ScaleDcaTypeEnum.atr].includes(
-            this.settings.scaleDcaType ?? ScaleDcaTypeEnum.percentage,
+            SharedData.settings.scaleDcaType ?? ScaleDcaTypeEnum.percentage,
           )
         ) {
           continue
@@ -1151,16 +1164,18 @@ class TIStrategy extends Strategy implements StrategyInterface {
         if (
           indicatorAction === IndicatorAction.closeDeal &&
           section !== IndicatorSection.sl &&
-          this.settings.dealCloseCondition === CloseConditionEnum.dynamicAr &&
-          this.settings.useTp
+          SharedData.settings.dealCloseCondition ===
+            CloseConditionEnum.dynamicAr &&
+          SharedData.settings.useTp
         ) {
           continue
         }
         if (
           indicatorAction === IndicatorAction.closeDeal &&
           section === IndicatorSection.sl &&
-          this.settings.dealCloseConditionSL === CloseConditionEnum.dynamicAr &&
-          this.settings.useSl
+          SharedData.settings.dealCloseConditionSL ===
+            CloseConditionEnum.dynamicAr &&
+          SharedData.settings.useSl
         ) {
           continue
         }
@@ -1406,7 +1421,7 @@ class TIStrategy extends Strategy implements StrategyInterface {
               value = lastData.value.price
               prevValue = prevData.value.price
             } else if (lastData.value.maType === maType) {
-              const findMA = Strategy.indicators.find(
+              const findMA = SharedData.indicators.find(
                 (ii) => ii.id === `${maUUID}@${nextBar.symbol}`,
               )
               if (findMA) {
@@ -1447,7 +1462,7 @@ class TIStrategy extends Strategy implements StrategyInterface {
             last = lastData.value.value
             prev = prevData.value.value
 
-            const findXO = Strategy.indicators.find(
+            const findXO = SharedData.indicators.find(
               (ii) => ii.id === `${xoUUID}@${nextBar.symbol}`,
             )
             if (findXO) {
@@ -1663,26 +1678,26 @@ class TIStrategy extends Strategy implements StrategyInterface {
           ) {
             if (indicatorCondition === IndicatorStartConditionEnum.cd) {
               action =
-                (this.math.gt(value, last) && this.math.lt(prevValue, prev)) ||
-                (this.math.gt(value, last) && this.math.lte(prevValue, prev))
+                (math.gt(value, last) && math.lt(prevValue, prev)) ||
+                (math.gt(value, last) && math.lte(prevValue, prev))
             }
             if (indicatorCondition === IndicatorStartConditionEnum.cu) {
               action =
-                (this.math.lt(value, last) && this.math.gt(prevValue, prev)) ||
-                (this.math.lt(value, last) && this.math.gte(prevValue, prev))
+                (math.lt(value, last) && math.gt(prevValue, prev)) ||
+                (math.lt(value, last) && math.gte(prevValue, prev))
             }
           }
           if (
             indicatorCondition === IndicatorStartConditionEnum.gt &&
             !skipAction
           ) {
-            action = this.math.gt(last, value)
+            action = math.gt(last, value)
           }
           if (
             indicatorCondition === IndicatorStartConditionEnum.lt &&
             !skipAction
           ) {
-            action = this.math.lt(last, value)
+            action = math.lt(last, value)
           }
 
           if (
@@ -1751,46 +1766,46 @@ class TIStrategy extends Strategy implements StrategyInterface {
           }
         }
 
-        Strategy.indicators = [
-          ...Strategy.indicators.filter((si) => si.id !== i.id),
+        SharedData.indicators = [
+          ...SharedData.indicators.filter((si) => si.id !== i.id),
           { ...i, data: [] },
         ]
       }
     }
     if (nextBar) {
-      const closeDealSl = [...Strategy.indicators].filter(
+      const closeDealSl = [...SharedData.indicators].filter(
         (i) =>
           i.settings.indicatorAction === IndicatorAction.closeDeal &&
           i.settings.section === IndicatorSection.sl &&
           !i.ignore &&
           i.symbol === nextBar.symbol,
       )
-      const closeDealTp = [...Strategy.indicators].filter(
+      const closeDealTp = [...SharedData.indicators].filter(
         (i) =>
           i.settings.indicatorAction === IndicatorAction.closeDeal &&
           i.settings.section !== IndicatorSection.sl &&
           !i.ignore &&
           i.symbol === nextBar.symbol,
       )
-      const startDeal = [...Strategy.indicators].filter(
+      const startDeal = [...SharedData.indicators].filter(
         (i) =>
           i.settings.indicatorAction === IndicatorAction.startDeal &&
           !i.ignore &&
           i.symbol === nextBar.symbol,
       )
-      const stopBot = [...Strategy.indicators].filter(
+      const stopBot = [...SharedData.indicators].filter(
         (i) =>
           i.settings.indicatorAction === IndicatorAction.stopBot &&
           !i.ignore &&
           i.symbol === nextBar.symbol,
       )
-      const startBot = [...Strategy.indicators].filter(
+      const startBot = [...SharedData.indicators].filter(
         (i) =>
           i.settings.indicatorAction === IndicatorAction.startBot &&
           !i.ignore &&
           i.symbol === nextBar.symbol,
       )
-      const startDca = [...Strategy.indicators].filter(
+      const startDca = [...SharedData.indicators].filter(
         (i) =>
           i.settings.indicatorAction === IndicatorAction.startDca &&
           !i.ignore &&
@@ -1824,26 +1839,26 @@ class TIStrategy extends Strategy implements StrategyInterface {
                 : findAll.length && findAll.length === findAllStatus.length)
             })
       if (
-        (this.settings.stopDealSlLogic === IndicatorsLogicEnum.and ||
-        !this.settings.stopDealSlLogic
+        (SharedData.settings.stopDealSlLogic === IndicatorsLogicEnum.and ||
+        !SharedData.settings.stopDealSlLogic
           ? closeDealSlGroupsStatus.every((r) => !!r)
           : closeDealSlGroupsStatus.some((r) => !!r)) &&
         closeDealSlGroupsStatus.length
       ) {
-        Strategy.indicatorEvents.push({
+        SharedData.indicatorEvents.push({
           type: IndicatorAction.closeDeal,
           side:
-            this.settings.strategy === StrategyEnum.long
+            SharedData.settings.strategy === StrategyEnum.long
               ? BotOrderSideEnum.sell
               : BotOrderSideEnum.buy,
           time: nextBar.time,
           price:
-            this.settings.strategy === StrategyEnum.long
+            SharedData.settings.strategy === StrategyEnum.long
               ? nextBar.high
               : nextBar.low,
           symbol: nextBar.symbol,
         })
-        this.closeAllDeals(
+        DealManager.closeAllDeals(
           {
             open: nextBar.open,
             time: nextBar.time,
@@ -1855,7 +1870,7 @@ class TIStrategy extends Strategy implements StrategyInterface {
           true,
         )
 
-        Strategy.indicators = Strategy.indicators.map((i) => {
+        SharedData.indicators = SharedData.indicators.map((i) => {
           if (closeDealSlStatus.map((ai) => ai.id).includes(i.id)) {
             return {
               ...i,
@@ -1887,15 +1902,15 @@ class TIStrategy extends Strategy implements StrategyInterface {
                 : findAll.length && findAll.length === findAllStatus.length)
             })
       if (
-        (this.settings.stopBotLogic === IndicatorsLogicEnum.and ||
-        !this.settings.stopBotLogic
+        (SharedData.settings.stopBotLogic === IndicatorsLogicEnum.and ||
+        !SharedData.settings.stopBotLogic
           ? stopBotGroupsStatus.every((r) => !!r)
           : stopBotGroupsStatus.some((r) => !!r)) &&
         stopBotGroupsStatus.length &&
-        Strategy.status === 'open' &&
-        !Strategy.preventOpen
+        SharedData.status === 'open' &&
+        !SharedData.preventOpen
       ) {
-        this.stopByIndicator({
+        DealManager.stopByIndicator({
           open: nextBar.open,
           time: nextBar.time,
           high: nextBar.high,
@@ -1904,7 +1919,7 @@ class TIStrategy extends Strategy implements StrategyInterface {
           symbol: nextBar.symbol,
         })
 
-        Strategy.indicators = Strategy.indicators.map((i) => {
+        SharedData.indicators = SharedData.indicators.map((i) => {
           if (stopBotStatus.map((ai) => ai.id).includes(i.id)) {
             return {
               ...i,
@@ -1936,17 +1951,17 @@ class TIStrategy extends Strategy implements StrategyInterface {
                 : findAll.length && findAll.length === findAllStatus.length)
             })
       if (
-        (this.settings.startBotLogic === IndicatorsLogicEnum.and ||
-        !this.settings.startBotLogic
+        (SharedData.settings.startBotLogic === IndicatorsLogicEnum.and ||
+        !SharedData.settings.startBotLogic
           ? startBotGroupsStatus.every((r) => !!r)
           : startBotGroupsStatus.some((r) => !!r)) &&
         startBotGroupsStatus.length &&
-        Strategy.preventOpen &&
-        Strategy.status === 'monitoring'
+        SharedData.preventOpen &&
+        SharedData.status === 'monitoring'
       ) {
-        Strategy.preventOpen = false
-        Strategy.status = 'open'
-        Strategy.indicators = Strategy.indicators.map((i) => {
+        SharedData.preventOpen = false
+        SharedData.status = 'open'
+        SharedData.indicators = SharedData.indicators.map((i) => {
           if (startBotStatus.map((ai) => ai.id).includes(i.id)) {
             return {
               ...i,
@@ -1982,26 +1997,26 @@ class TIStrategy extends Strategy implements StrategyInterface {
                 : findAll.length && findAll.length === findAllStatus.length)
             })
       if (
-        (this.settings.stopDealLogic === IndicatorsLogicEnum.and ||
-        !this.settings.stopDealLogic
+        (SharedData.settings.stopDealLogic === IndicatorsLogicEnum.and ||
+        !SharedData.settings.stopDealLogic
           ? closeDealTpGroupsStatus.every((r) => !!r)
           : closeDealTpGroupsStatus.some((r) => !!r)) &&
         closeDealTpGroupsStatus.length
       ) {
-        Strategy.indicatorEvents.push({
+        SharedData.indicatorEvents.push({
           type: IndicatorAction.closeDeal,
           side:
-            this.settings.strategy === StrategyEnum.long
+            SharedData.settings.strategy === StrategyEnum.long
               ? BotOrderSideEnum.sell
               : BotOrderSideEnum.buy,
           time: nextBar.time,
           price:
-            this.settings.strategy === StrategyEnum.long
+            SharedData.settings.strategy === StrategyEnum.long
               ? nextBar.high
               : nextBar.low,
           symbol: nextBar.symbol,
         })
-        this.closeAllDeals({
+        DealManager.closeAllDeals({
           open: nextBar.open,
           time: nextBar.time,
           high: nextBar.high,
@@ -2010,7 +2025,7 @@ class TIStrategy extends Strategy implements StrategyInterface {
           symbol: nextBar.symbol,
         })
 
-        Strategy.indicators = Strategy.indicators.map((i) => {
+        SharedData.indicators = SharedData.indicators.map((i) => {
           if (closeDealTpStatus.map((ai) => ai.id).includes(i.id)) {
             return {
               ...i,
@@ -2042,47 +2057,49 @@ class TIStrategy extends Strategy implements StrategyInterface {
                 : findAll.length && findAll.length === findAllStatus.length)
             })
       if (
-        (this.settings.startDealLogic === IndicatorsLogicEnum.and ||
-        !this.settings.startDealLogic
+        (SharedData.settings.startDealLogic === IndicatorsLogicEnum.and ||
+        !SharedData.settings.startDealLogic
           ? startDealGroupsStatus.every((r) => !!r)
           : startDealGroupsStatus.some((r) => !!r)) &&
         startDealGroupsStatus.length
       ) {
-        Strategy.indicatorEvents.push({
+        SharedData.indicatorEvents.push({
           type: IndicatorAction.startDeal,
           side:
-            this.settings.strategy === StrategyEnum.long
+            SharedData.settings.strategy === StrategyEnum.long
               ? BotOrderSideEnum.buy
               : BotOrderSideEnum.sell,
           time: nextBar.time,
           price:
-            this.settings.strategy === StrategyEnum.long
+            SharedData.settings.strategy === StrategyEnum.long
               ? nextBar.low
               : nextBar.high,
           symbol: nextBar.symbol,
         })
         const useMaxDealsPerSignal =
-          this.settings.indicators
+          SharedData.settings.indicators
             .filter((i) => i.indicatorAction === IndicatorAction.startDeal)
             .reduce(
               (acc, v) => acc.add(v.indicatorInterval),
               new Set<ExchangeIntervals>(),
             ).size > 1
-            ? typeof this.settings.useMaxDealsPerHigherTimeframe !== 'undefined'
-              ? !!this.settings.useMaxDealsPerHigherTimeframe
+            ? typeof SharedData.settings.useMaxDealsPerHigherTimeframe !==
+              'undefined'
+              ? !!SharedData.settings.useMaxDealsPerHigherTimeframe
               : true
             : false
         const maxDealsPerSignal =
-          typeof this.settings.useMaxDealsPerHigherTimeframe !== 'undefined'
-            ? !this.settings.useMaxDealsPerHigherTimeframe
+          typeof SharedData.settings.useMaxDealsPerHigherTimeframe !==
+          'undefined'
+            ? !SharedData.settings.useMaxDealsPerHigherTimeframe
               ? Infinity
-              : +(this.settings.maxDealsPerHigherTimeframe ?? '1')
+              : +(SharedData.settings.maxDealsPerHigherTimeframe ?? '1')
             : 1
         const cbIfNotOpened = () => {
-          Strategy.indicators = Strategy.indicators.map((i) => {
+          SharedData.indicators = SharedData.indicators.map((i) => {
             if (startDealStatus.map((ai) => ai.id).includes(i.id)) {
               const maxNumberExceed =
-                i.interval === Strategy.highestInterval &&
+                i.interval === SharedData.highestInterval &&
                 useMaxDealsPerSignal &&
                 Math.max(0, (i.status.numberOfSignals ?? 0) - 1) >=
                   maxDealsPerSignal
@@ -2103,7 +2120,7 @@ class TIStrategy extends Strategy implements StrategyInterface {
                           : false
                         : false,
                       numberOfSignals:
-                        i.interval === Strategy.highestInterval
+                        i.interval === SharedData.highestInterval
                           ? Math.max(0, (i.status.numberOfSignals ?? 0) - 1)
                           : i.status.numberOfSignals,
                     },
@@ -2112,7 +2129,7 @@ class TIStrategy extends Strategy implements StrategyInterface {
             return i
           })
         }
-        this.openDeal(
+        DealManager.openDeal(
           nextBar.open,
           nextBar.time,
           nextBar.high,
@@ -2122,10 +2139,10 @@ class TIStrategy extends Strategy implements StrategyInterface {
           cbIfNotOpened,
         )
 
-        Strategy.indicators = Strategy.indicators.map((i) => {
+        SharedData.indicators = SharedData.indicators.map((i) => {
           if (startDealStatus.map((ai) => ai.id).includes(i.id)) {
             const maxNumberExceed =
-              i.interval === Strategy.highestInterval &&
+              i.interval === SharedData.highestInterval &&
               useMaxDealsPerSignal &&
               (i.status.numberOfSignals ?? 0) + 1 >= maxDealsPerSignal
             return {
@@ -2145,7 +2162,7 @@ class TIStrategy extends Strategy implements StrategyInterface {
                         : false
                       : false,
                     numberOfSignals:
-                      i.interval === Strategy.highestInterval
+                      i.interval === SharedData.highestInterval
                         ? (i.status?.numberOfSignals ?? 0) + 1
                         : i.status.numberOfSignals,
                   },
@@ -2156,10 +2173,10 @@ class TIStrategy extends Strategy implements StrategyInterface {
       }
       if (
         startDcaStatus.length &&
-        this.settings.dcaCondition === DCAConditionEnum.indicators
+        SharedData.settings.dcaCondition === DCAConditionEnum.indicators
       ) {
         for (const i of startDcaStatus) {
-          Strategy.indicators = Strategy.indicators.map((is) => {
+          SharedData.indicators = SharedData.indicators.map((is) => {
             if (i.id === is.id) {
               return {
                 ...i,
@@ -2177,7 +2194,12 @@ class TIStrategy extends Strategy implements StrategyInterface {
             return is
           })
           const index = startDca.findIndex((si) => si.id === i.id)
-          this.addDCAOrder(index, nextBar.close, nextBar.time, nextBar.symbol)
+          DealManager.addDCAOrder(
+            index,
+            nextBar.close,
+            nextBar.time,
+            nextBar.symbol,
+          )
         }
       }
     }
