@@ -1,6 +1,6 @@
 {
   "name": "@gainium/backtester",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "High-performance TypeScript backtesting engine for DCA and Grid trading strategies with comprehensive analytics and real-time optimization capabilities",
   "keywords": [
     "backtesting",
