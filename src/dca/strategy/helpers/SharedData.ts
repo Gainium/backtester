@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 import {
   type DCABotSettings,
   type Symbols,
@@ -28,8 +29,8 @@ import DCABotFunctions from '../../../helper/dcaBotFunctions'
 import { MathHelper } from '../../../helper/math'
 import { Indicator } from '../ti'
 import { StrategyInput } from '../main'
-import ComboBotFunctions from 'src/helper/comboBotFunctions'
-import findUSDRate from 'src/helper/price'
+import ComboBotFunctions from '../../../helper/comboBotFunctions'
+import findUSDRate from '../../../helper/price'
 
 export type DataType = {
   bar: FullBar[]
@@ -470,15 +471,15 @@ export class SharedData {
     SharedData.coinm = !!settings.coinm
     SharedData.leverage = settings.futures
       ? settings.marginType !== BotMarginTypeEnum.inherit
-        ? settings.leverage ?? 1
+        ? (settings.leverage ?? 1)
         : 1
       : 1
     SharedData.comboBasedOn =
       settings.comboTpBase && !settings.useTp && !settings.useSl
         ? ComboTpBase.filled
         : !settings.comboTpBase || settings.comboTpBase === ComboTpBase.full
-        ? ComboTpBase.full
-        : ComboTpBase.filled
+          ? ComboTpBase.full
+          : ComboTpBase.filled
     SharedData.tpAr =
       settings.dealCloseCondition === CloseConditionEnum.dynamicAr &&
       settings.useTp
@@ -495,7 +496,7 @@ export class SharedData {
     SharedData.baseSlOn =
       combo || settings.trailingSl || settings.moveSL
         ? BaseSlOnEnum.avg
-        : settings.baseSlOn ?? BaseSlOnEnum.avg
+        : (settings.baseSlOn ?? BaseSlOnEnum.avg)
     SharedData.futuresStrategy = this.futures
       ? SharedData.long
         ? FuturesStrategyEnum.long

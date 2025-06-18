@@ -26,12 +26,12 @@ import {
   FullGridWithTime,
   FuturesStrategyEnum,
   PositionSide,
-} from 'src/types'
+} from '../../../types'
 import { SharedData } from './SharedData'
 import { v4 } from 'uuid'
 import { StrategyUtils } from './StrategyUtils'
 import { PriceCalculator } from './PriceCalculator'
-import { MathHelper } from 'src/helper/math'
+import { MathHelper } from '../../../helper/math'
 
 const math = new MathHelper()
 
@@ -128,8 +128,8 @@ export class TradeManager {
       currentValue > initialValue
         ? cg.side === BotOrderSideEnum.buy
         : currentValue < initialValue
-        ? cg.side === BotOrderSideEnum.sell
-        : false,
+          ? cg.side === BotOrderSideEnum.sell
+          : false,
     )) {
       const currentGridsOnPrice = [
         ...TradeManager.createOrders(true, false, g.side, g.price),
@@ -333,17 +333,17 @@ export class TradeManager {
             ? SharedData.currentBalancesByAsset.base
             : 0
           : SharedData.profitBase
-          ? SharedData.currentBalancesByAsset.base +
-            SharedData.currentBalancesByAsset.quote / price
-          : 0,
+            ? SharedData.currentBalancesByAsset.base +
+              SharedData.currentBalancesByAsset.quote / price
+            : 0,
         quote: SharedData.futures
           ? SharedData.coinm
             ? 0
             : SharedData.currentBalancesByAsset.quote
           : SharedData.profitBase
-          ? 0
-          : SharedData.currentBalancesByAsset.base * price +
-            SharedData.currentBalancesByAsset.quote,
+            ? 0
+            : SharedData.currentBalancesByAsset.base * price +
+              SharedData.currentBalancesByAsset.quote,
       }
     }
     SharedData.currentBalances = SharedData.futures
@@ -351,10 +351,10 @@ export class TradeManager {
         ? SharedData.currentBalancesByAsset.base
         : SharedData.currentBalancesByAsset.quote
       : SharedData.profitBase
-      ? SharedData.currentBalancesByAsset.base +
-        SharedData.currentBalancesByAsset.quote / price
-      : SharedData.currentBalancesByAsset.base * price +
-        SharedData.currentBalancesByAsset.quote
+        ? SharedData.currentBalancesByAsset.base +
+          SharedData.currentBalancesByAsset.quote / price
+        : SharedData.currentBalancesByAsset.base * price +
+          SharedData.currentBalancesByAsset.quote
     SharedData.currentBalancesUsd =
       SharedData.currentBalances * SharedData.usdRate
   }
@@ -506,8 +506,8 @@ export class TradeManager {
           ? base
           : quote
         : SharedData.profitBase
-        ? quote / price + base
-        : base * price + quote
+          ? quote / price + base
+          : base * price + quote
       SharedData.initialBalancesUsd =
         SharedData.initialBalances *
         (SharedData.firstUsdRate || SharedData.usdRate)
@@ -920,8 +920,8 @@ export class TradeManager {
           ? SharedData.symbol.baseAsset.name
           : SharedData.symbol.quoteAsset.name
         : SharedData.profitBase
-        ? SharedData.symbol.baseAsset.name
-        : SharedData.symbol.quoteAsset.name,
+          ? SharedData.symbol.baseAsset.name
+          : SharedData.symbol.quoteAsset.name,
       index: SharedData.transactionIndex,
       idBuy: order.side === BotOrderSideEnum.buy ? order.id : matchedId,
       idSell: order.side === BotOrderSideEnum.buy ? matchedId : order.id,

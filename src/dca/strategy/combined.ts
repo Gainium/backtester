@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 import { Strategy, StrategyInterface } from './main'
 import type { StrategyInput } from './main'
 import type {
@@ -11,7 +12,7 @@ import { FileReader } from '../../helper/fileReader'
 import { DataProcessor } from '../../helper/dataProcessor'
 import { SharedData } from './helpers/SharedData'
 import { PortfolioManager } from './helpers/PortfolioManager'
-import { MathHelper } from 'src/helper/math'
+import { MathHelper } from '../../helper/math'
 
 const math = new MathHelper()
 

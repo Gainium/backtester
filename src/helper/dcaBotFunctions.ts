@@ -295,8 +295,8 @@ class DCABotFunctions {
           ? OrderSizeTypeEnum.base
           : OrderSizeTypeEnum.quote
         : settings.strategy === StrategyEnum.long
-        ? OrderSizeTypeEnum.quote
-        : OrderSizeTypeEnum.base
+          ? OrderSizeTypeEnum.quote
+          : OrderSizeTypeEnum.base
       : _orderSizeType
     const useTp = _useTp && dealCloseCondition === CloseConditionEnum.tp
     const useArTp =
@@ -323,22 +323,22 @@ class DCABotFunctions {
             true,
           )
         : orderSizeType === OrderSizeTypeEnum.base
-        ? this.math.round(baseOrderSize + (sizes?.base ?? 0), precision, true)
-        : orderSizeType === OrderSizeTypeEnum.quote
-        ? this.math.round(
-            (baseOrderSize * (coinm ? symbol.quoteAsset.minAmount : 1)) /
-              latestPrice +
-              (sizes?.base ?? 0),
-            precision,
-            true,
-          )
-        : this.math.round(
-            symbol.quoteAsset.minAmount
-              ? symbol.quoteAsset.minAmount / latestPrice
-              : symbol.baseAsset.minAmount,
-            precision,
-            true,
-          )
+          ? this.math.round(baseOrderSize + (sizes?.base ?? 0), precision, true)
+          : orderSizeType === OrderSizeTypeEnum.quote
+            ? this.math.round(
+                (baseOrderSize * (coinm ? symbol.quoteAsset.minAmount : 1)) /
+                  latestPrice +
+                  (sizes?.base ?? 0),
+                precision,
+                true,
+              )
+            : this.math.round(
+                symbol.quoteAsset.minAmount
+                  ? symbol.quoteAsset.minAmount / latestPrice
+                  : symbol.baseAsset.minAmount,
+                precision,
+                true,
+              )
     let qtyToUse = 0
     if (
       orderSizeType === OrderSizeTypeEnum.percFree ||
@@ -352,12 +352,12 @@ class DCABotFunctions {
               ? symbol.baseAsset.name
               : symbol.quoteAsset.name
             : settings.terminalDealType === TerminalDealTypeEnum.import
-            ? settings.strategy === StrategyEnum.long
-              ? symbol.baseAsset.name
-              : symbol.quoteAsset.name
-            : settings.strategy === StrategyEnum.short
-            ? symbol.baseAsset.name
-            : symbol.quoteAsset.name),
+              ? settings.strategy === StrategyEnum.long
+                ? symbol.baseAsset.name
+                : symbol.quoteAsset.name
+              : settings.strategy === StrategyEnum.short
+                ? symbol.baseAsset.name
+                : symbol.quoteAsset.name),
       )
       qtyToUse = findBalance
         ? orderSizeType === OrderSizeTypeEnum.percFree
@@ -367,7 +367,7 @@ class DCABotFunctions {
       if (settings.futures) {
         qtyToUse *=
           settings.marginType !== BotMarginTypeEnum.inherit
-            ? settings.leverage ?? 1
+            ? (settings.leverage ?? 1)
             : 1
       }
       baseQty = this.math.round(
@@ -381,12 +381,12 @@ class DCABotFunctions {
                 ? 1
                 : latestPrice
               : settings.terminalDealType === TerminalDealTypeEnum.import
-              ? settings.strategy === StrategyEnum.long
-                ? 1
-                : latestPrice
-              : settings.strategy === StrategyEnum.short
-              ? 1
-              : latestPrice),
+                ? settings.strategy === StrategyEnum.long
+                  ? 1
+                  : latestPrice
+                : settings.strategy === StrategyEnum.short
+                  ? 1
+                  : latestPrice),
         ),
         precision,
         true,
@@ -619,8 +619,8 @@ class DCABotFunctions {
               (i) => i.indicatorAction === IndicatorAction.startDca,
             ).length
           : settings.dcaCondition === DCAConditionEnum.custom
-          ? (settings.dcaCustom ?? []).length
-          : parseInt(`${settings.ordersCount}`)
+            ? (settings.dcaCustom ?? []).length
+            : parseInt(`${settings.ordersCount}`)
       const useVolumeChange =
         settings.dcaVolumeBaseOn === DCAVolumeType.change &&
         settings.useTp &&
@@ -698,7 +698,7 @@ class DCABotFunctions {
               const stepAr = i < 2 ? 1 : stepScale ** (i - 2)
               value *= +(indicator.dynamicArFactor || '1') * stepAr
               const lastPrice =
-                i === 1 ? latestPrice : orders[orders.length - 1]?.price ?? 0
+                i === 1 ? latestPrice : (orders[orders.length - 1]?.price ?? 0)
               price = this.math.round(
                 lastPrice +
                   value * (settings.strategy === StrategyEnum.long ? -1 : 1),
@@ -802,48 +802,48 @@ class DCABotFunctions {
           orderSizeType === OrderSizeTypeEnum.usd
             ? this.math.round(orderSize / (usdPrice * latestPrice), precision)
             : orderSizeType === OrderSizeTypeEnum.quote
-            ? this.math.round(
-                ((orderSize * (coinm ? symbol.quoteAsset.minAmount : 1)) /
-                  price) *
-                  volumeVal +
-                  (sizes?.dca?.[i - 1] ?? 0),
-                precision,
-              )
-            : orderSizeType === OrderSizeTypeEnum.base
-            ? this.math.round(
-                orderSize * volumeVal + (sizes?.dca?.[i - 1] ?? 0),
-                precision,
-              )
-            : orderSizeType === OrderSizeTypeEnum.percFree ||
-              orderSizeType === OrderSizeTypeEnum.percTotal
-            ? precOrderSize !== 0
-              ? this.math.round(precOrderSize * volumeVal, precision)
-              : this.math.round(
-                  ((qtyToUse * (+orderSize / 100)) /
-                    (settings.futures
-                      ? settings.coinm
-                        ? 1
-                        : price
-                      : settings.terminalDealType ===
-                        TerminalDealTypeEnum.import
-                      ? settings.strategy === StrategyEnum.long
-                        ? 1
-                        : price
-                      : settings.strategy === StrategyEnum.short
-                      ? 1
-                      : price)) *
-                    volumeVal,
+              ? this.math.round(
+                  ((orderSize * (coinm ? symbol.quoteAsset.minAmount : 1)) /
+                    price) *
+                    volumeVal +
+                    (sizes?.dca?.[i - 1] ?? 0),
                   precision,
                 )
-            : this.math.round(
-                Math.max(
-                  symbol.quoteAsset.minAmount
-                    ? symbol.quoteAsset.minAmount / latestPrice
-                    : symbol.baseAsset.minAmount,
-                  (qtyToUse * orderSize) / 100 / latestPrice,
-                ),
-                precision,
-              )
+              : orderSizeType === OrderSizeTypeEnum.base
+                ? this.math.round(
+                    orderSize * volumeVal + (sizes?.dca?.[i - 1] ?? 0),
+                    precision,
+                  )
+                : orderSizeType === OrderSizeTypeEnum.percFree ||
+                    orderSizeType === OrderSizeTypeEnum.percTotal
+                  ? precOrderSize !== 0
+                    ? this.math.round(precOrderSize * volumeVal, precision)
+                    : this.math.round(
+                        ((qtyToUse * (+orderSize / 100)) /
+                          (settings.futures
+                            ? settings.coinm
+                              ? 1
+                              : price
+                            : settings.terminalDealType ===
+                                TerminalDealTypeEnum.import
+                              ? settings.strategy === StrategyEnum.long
+                                ? 1
+                                : price
+                              : settings.strategy === StrategyEnum.short
+                                ? 1
+                                : price)) *
+                          volumeVal,
+                        precision,
+                      )
+                  : this.math.round(
+                      Math.max(
+                        symbol.quoteAsset.minAmount
+                          ? symbol.quoteAsset.minAmount / latestPrice
+                          : symbol.baseAsset.minAmount,
+                        (qtyToUse * orderSize) / 100 / latestPrice,
+                      ),
+                      precision,
+                    )
         if (qty < symbol.baseAsset.minAmount) {
           qty = symbol.baseAsset.minAmount
         }
@@ -913,8 +913,8 @@ class DCABotFunctions {
             price < 0
               ? `This order won't be placed, because price deviation more than 100%`
               : qty * price < symbol.quoteAsset.minAmount
-              ? `This order won't be placed, because order amount is less than min allowed by the exchange: ${symbol.quoteAsset.minAmount} ${symbol.quoteAsset.name}`
-              : '',
+                ? `This order won't be placed, because order amount is less than min allowed by the exchange: ${symbol.quoteAsset.minAmount} ${symbol.quoteAsset.name}`
+                : '',
           base: this.math.round(base, precision),
           quote: this.math.round(quote, symbol.priceAssetPrecision),
           levelNumber: i,
@@ -939,7 +939,7 @@ class DCABotFunctions {
       !this.settings.useMultiSl &&
       !this.settings.trailingSl
     let finalBreakeven = orders.length
-      ? orders[orders.length - 1].avgPrice ?? latestPrice
+      ? (orders[orders.length - 1].avgPrice ?? latestPrice)
       : latestPrice
 
     const slOrder: DCAGrid = {

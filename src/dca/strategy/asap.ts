@@ -306,8 +306,8 @@ class ASAPStrategy extends Strategy implements StrategyInterface {
           (config.multi
             ? config.maxPerSymbol
             : config.useDynamic && config.maxDeals
-            ? config.maxDeals
-            : 1))
+              ? config.maxDeals
+              : 1))
     )
   }
 

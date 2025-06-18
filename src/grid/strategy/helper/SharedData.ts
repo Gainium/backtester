@@ -19,7 +19,7 @@
  * @fileoverview Centralized data management for grid trading strategy
  */
 
-import BotFunctions from 'src/helper/botFunctions'
+import BotFunctions from '../../../helper/botFunctions'
 import {
   BacktestingTransaction,
   Bar,
@@ -37,9 +37,9 @@ import {
   StrategyEnum,
   Symbols,
   ValueChangeHistory,
-} from 'src/types'
+} from '../../../types'
 import { GRIDStrategyInput } from '..'
-import findUSDRate from 'src/helper/price'
+import findUSDRate from '../../../helper/price'
 
 /**
  * Centralized data management class for grid trading strategy
@@ -283,7 +283,7 @@ export class SharedData {
       this.coinm || this.settings.profitCurrency === 'base'
     SharedData.leverage = settings.futures
       ? settings.marginType !== BotMarginTypeEnum.inherit
-        ? this.settings.leverage ?? 1
+        ? (this.settings.leverage ?? 1)
         : 1
       : 1
     SharedData.futures = !!settings.futures

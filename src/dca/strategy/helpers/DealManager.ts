@@ -1,4 +1,4 @@
-import { MathHelper } from 'src/helper/math'
+import { MathHelper } from '../../../helper/math'
 import {
   Deal,
   FullGrid,
@@ -48,8 +48,8 @@ import {
   SuperTrendResult,
 } from '@gainium/indicators'
 import { StrategyUtils } from './StrategyUtils'
-import { friendlyTime } from 'src/helper/timeFunctions'
-import { checkNumber } from 'src/helper/utils'
+import { friendlyTime } from '../../../helper/timeFunctions'
+import { checkNumber } from '../../../helper/utils'
 import { v4 } from 'uuid'
 import { DealCounters } from './optimizations/DealCounters'
 
@@ -301,8 +301,8 @@ export class DealManager {
           ? usageBase
           : usageQuote
         : SharedData.long
-        ? usageQuote * (SharedData.profitBase ? 1 / deal.avgPrice : 1)
-        : usageBase * (SharedData.profitBase ? 1 : deal.avgPrice)) *
+          ? usageQuote * (SharedData.profitBase ? 1 / deal.avgPrice : 1)
+          : usageBase * (SharedData.profitBase ? 1 : deal.avgPrice)) *
         (SharedData.profitBase ? deal.avgPrice : 1) *
         (SharedData.profitBase ? usdRateQuote : usdRate),
       3,
@@ -417,18 +417,18 @@ export class DealManager {
           : d.initialBalance.base - (d.currentBalance.base - _b)
         : 0
       : SharedData.long
-      ? 0
-      : d.initialBalance.base - (d.currentBalance.base - _b)
+        ? 0
+        : d.initialBalance.base - (d.currentBalance.base - _b)
 
     const quote = SharedData.futures
       ? SharedData.coinm
         ? 0
         : !SharedData.long
-        ? d.currentBalance.quote
-        : d.initialBalance.quote - (d.currentBalance.quote - _q)
+          ? d.currentBalance.quote
+          : d.initialBalance.quote - (d.currentBalance.quote - _q)
       : SharedData.long
-      ? d.initialBalance.quote - (d.currentBalance.quote - _q)
-      : 0
+        ? d.initialBalance.quote - (d.currentBalance.quote - _q)
+        : 0
 
     const usage = {
       current: {
@@ -437,15 +437,15 @@ export class DealManager {
             ? base
             : 0
           : SharedData.long
-          ? 0
-          : base,
+            ? 0
+            : base,
         quote: SharedData.futures
           ? SharedData.coinm
             ? 0
             : quote
           : SharedData.long
-          ? quote
-          : 0,
+            ? quote
+            : 0,
       },
     }
     return usage
@@ -477,10 +477,10 @@ export class DealManager {
       (units === CooldownUnits.seconds
         ? 1000
         : units === CooldownUnits.minutes
-        ? 60 * 1000
-        : units === CooldownUnits.hours
-        ? 60 * 60 * 1000
-        : 24 * 60 * 60 * 1000)
+          ? 60 * 1000
+          : units === CooldownUnits.hours
+            ? 60 * 60 * 1000
+            : 24 * 60 * 60 * 1000)
     )
   }
   // Deal Risk Management methods
@@ -497,7 +497,7 @@ export class DealManager {
       const lastTime =
         cooldownAfterDealStartOption === CooldownOptionsEnum.bot
           ? SharedData.lastOpenedDeal
-          : SharedData.lastOpenedDealPerSymbol.get(symbol) ?? 0
+          : (SharedData.lastOpenedDealPerSymbol.get(symbol) ?? 0)
       return (
         time - lastTime >=
         DealManager.convertCooldown(
@@ -523,7 +523,7 @@ export class DealManager {
         time -
           (cooldownAfterDealStartOption === CooldownOptionsEnum.bot
             ? SharedData.lastClosedDeal
-            : SharedData.lastClosedDealPerSymbol.get(symbol) ?? 0) >=
+            : (SharedData.lastClosedDealPerSymbol.get(symbol) ?? 0)) >=
         DealManager.convertCooldown(
           SharedData.settings.cooldownAfterDealStopInterval,
           SharedData.settings.cooldownAfterDealStopUnits,
@@ -693,11 +693,11 @@ export class DealManager {
                 ? 1 + overValue / 100
                 : 1
               : settings.dynamicPriceFilterDirection ===
-                  DynamicPriceFilterDirectionEnum.under ||
-                settings.dynamicPriceFilterDirection ===
-                  DynamicPriceFilterDirectionEnum.overAndUnder
-              ? 1 - underValue / 100
-              : 1),
+                    DynamicPriceFilterDirectionEnum.under ||
+                  settings.dynamicPriceFilterDirection ===
+                    DynamicPriceFilterDirectionEnum.overAndUnder
+                ? 1 - underValue / 100
+                : 1),
           end:
             (settings.dynamicPriceFilterPriceType ===
             DynamicPriceFilterPriceTypeEnum.avg
@@ -711,11 +711,11 @@ export class DealManager {
                 ? 1 - underValue / 100
                 : 1
               : settings.dynamicPriceFilterDirection ===
-                  DynamicPriceFilterDirectionEnum.over ||
-                settings.dynamicPriceFilterDirection ===
-                  DynamicPriceFilterDirectionEnum.overAndUnder
-              ? 1 + overValue / 100
-              : 1),
+                    DynamicPriceFilterDirectionEnum.over ||
+                  settings.dynamicPriceFilterDirection ===
+                    DynamicPriceFilterDirectionEnum.overAndUnder
+                ? 1 + overValue / 100
+                : 1),
         }))
         const currentRange = {
           start: price,
@@ -890,8 +890,8 @@ export class DealManager {
             bbCrossingValue === BBCrossingEnum.lower
               ? data.result.lower
               : bbCrossingValue === BBCrossingEnum.middle
-              ? data.result.middle
-              : data.result.upper
+                ? data.result.middle
+                : data.result.upper
         }
         if (type === IndicatorEnum.ma) {
           const data = last.value as MAResult
@@ -923,8 +923,8 @@ export class DealManager {
             typeof riskMinSl !== 'undefined' && `${riskMinSl}` !== 'null'
               ? Math.abs(+riskMinSl) / 100
               : riskSlType === RiskSlTypeEnum.perc && riskSlAmountPerc
-              ? Math.abs(+riskSlAmountPerc) / 100
-              : null
+                ? Math.abs(+riskSlAmountPerc) / 100
+                : null
           const maxSl = riskMaxSl ? Math.abs(+riskMaxSl) / 100 : 1
           let currentSl = Math.abs((currentRiskSlPrice - price) / price)
           if (minSl && currentSl < minSl) {
@@ -949,8 +949,8 @@ export class DealManager {
               ? precisionBase
               : precisionQuote
             : SharedData.long
-            ? precisionQuote
-            : precisionBase
+              ? precisionQuote
+              : precisionBase
 
           let riskBalance = symbol
             ? +(
@@ -962,8 +962,8 @@ export class DealManager {
                         ? symbol.baseAsset.name
                         : symbol.quoteAsset.name
                       : SharedData.long
-                      ? symbol.quoteAsset.name
-                      : symbol.baseAsset.name),
+                        ? symbol.quoteAsset.name
+                        : symbol.baseAsset.name),
                 )?.free || '0'
               )
             : 0
@@ -978,8 +978,8 @@ export class DealManager {
                   ? symbol?.baseAsset.minAmount
                   : symbol?.quoteAsset.minAmount
                 : SharedData.long
-                ? symbol?.quoteAsset.minAmount
-                : symbol?.baseAsset.minAmount) ?? 0) * 10
+                  ? symbol?.quoteAsset.minAmount
+                  : symbol?.baseAsset.minAmount) ?? 0) * 10
           }
           const riskSize = math.round(
             riskSlType === RiskSlTypeEnum.fixed
@@ -1170,8 +1170,8 @@ export class DealManager {
             (_price || deal.avgPrice)
           : deal.currentBalance.base
         : SharedData.profitBase
-        ? deal.currentBalance.quote / (_price || deal.avgPrice)
-        : deal.initialBalance.base - deal.currentBalance.base
+          ? deal.currentBalance.quote / (_price || deal.avgPrice)
+          : deal.initialBalance.base - deal.currentBalance.base
       : filledRegular.reduce((acc, g) => acc + g.qty, 0) -
         filledTP.reduce((acc, g) => acc + g.qty, 0)
     const origQty = qty
@@ -1263,10 +1263,10 @@ export class DealManager {
       tpOrder.qty = SharedData.coinm
         ? newQty
         : SharedData.long
-        ? Math.min(tpOrder.qty, newQty)
-        : sl
-        ? Math.min(tpOrder.qty, newQty)
-        : Math.max(tpOrder.qty, newQty)
+          ? Math.min(tpOrder.qty, newQty)
+          : sl
+            ? Math.min(tpOrder.qty, newQty)
+            : Math.max(tpOrder.qty, newQty)
     }
     if (
       tpOrder.price * tpOrder.qty < symbol.quoteAsset.minAmount &&
@@ -1601,8 +1601,8 @@ export class DealManager {
       ? d.trailingMode === TrailingModeEnum.tsl && slPerc
         ? d.bestPrice * (1 + sl)
         : d.trailingMode === TrailingModeEnum.ttp && trailingTpPerc
-        ? d.bestPrice * (1 - tp)
-        : 0
+          ? d.bestPrice * (1 - tp)
+          : 0
       : 0
     if (newTrailingLevel !== d.trailingLevel && !SharedData.combo) {
       d.trailingLevel = newTrailingLevel
@@ -1931,11 +1931,11 @@ export class DealManager {
                 (si) => si.indicatorAction === IndicatorAction.startDca,
               ).length + 1
             : SharedData.settings.dcaCondition === DCAConditionEnum.custom
-            ? (SharedData.settings.dcaCustom ?? []).length + 1
-            : initialOrders.filter((o) => o.type === DCAOrderTypeEnum.dca)
-                .length +
-              1 +
-              hiddenDCA.length
+              ? (SharedData.settings.dcaCustom ?? []).length + 1
+              : initialOrders.filter((o) => o.type === DCAOrderTypeEnum.dca)
+                  .length +
+                1 +
+                hiddenDCA.length
           : 1,
         complete: hiddenDCA.length + 1,
         max: hiddenDCA.length + 1,
@@ -1948,15 +1948,15 @@ export class DealManager {
               ? baseUsage
               : 0
             : SharedData.long
-            ? 0
-            : baseUsage,
+              ? 0
+              : baseUsage,
           quote: SharedData.futures
             ? SharedData.coinm
               ? 0
               : quoteUsage
             : SharedData.long
-            ? quoteUsage
-            : 0,
+              ? quoteUsage
+              : 0,
         },
         max: {
           base: SharedData.futures
@@ -1964,15 +1964,15 @@ export class DealManager {
               ? maxBase
               : 0
             : SharedData.long
-            ? 0
-            : maxBase,
+              ? 0
+              : maxBase,
           quote: SharedData.futures
             ? SharedData.coinm
               ? 0
               : maxQuote
             : SharedData.long
-            ? maxQuote
-            : 0,
+              ? maxQuote
+              : 0,
         },
       },
     }
@@ -2009,8 +2009,8 @@ export class DealManager {
         ? deal.symbol.baseAsset.name
         : deal.symbol.quoteAsset.name
       : SharedData.long
-      ? deal.symbol.quoteAsset.name
-      : deal.symbol.baseAsset.name
+        ? deal.symbol.quoteAsset.name
+        : deal.symbol.baseAsset.name
     if (!SharedData.balance.has(key)) {
       const usdRateQuote = SharedData.usdRateQuote.get(s) ?? 1
       const usdRate = SharedData.usdRate.get(s) ?? 1
@@ -2021,18 +2021,19 @@ export class DealManager {
             ? deal.usage.max.base
             : deal.usage.max.quote
           : SharedData.long
-          ? deal.usage.max.quote *
-            (SharedData.profitBase ? 1 / deal.startPrice : 1)
-          : deal.usage.max.base *
-            (SharedData.profitBase ? 1 : deal.startPrice)) / SharedData.leverage
+            ? deal.usage.max.quote *
+              (SharedData.profitBase ? 1 / deal.startPrice : 1)
+            : deal.usage.max.base *
+              (SharedData.profitBase ? 1 : deal.startPrice)) /
+        SharedData.leverage
       let balance =
         (SharedData.futures
           ? SharedData.coinm
             ? deal.usage.max.base
             : deal.usage.max.quote
           : SharedData.long
-          ? deal.usage.max.quote
-          : deal.usage.max.base) / SharedData.leverage
+            ? deal.usage.max.quote
+            : deal.usage.max.base) / SharedData.leverage
       const { maxNumberOfOpenDeals, maxDealsPerPair, useMulti } =
         SharedData.settings
       if (
@@ -2149,11 +2150,11 @@ export class DealManager {
           ? usageBase
           : usageQuote
         : SharedData.long
-        ? usageQuote * (SharedData.profitBase ? 1 / d.lastPrice : 1)
-        : usageBase * (SharedData.profitBase ? 1 : d.lastPrice)
+          ? usageQuote * (SharedData.profitBase ? 1 / d.lastPrice : 1)
+          : usageBase * (SharedData.profitBase ? 1 : d.lastPrice)
       : SharedData.profitBase
-      ? base
-      : quote
+        ? base
+        : quote
     const perc = math.round(
       (total / denominator) * 100 * SharedData.leverage,
       2,
@@ -2216,8 +2217,8 @@ export class DealManager {
             ? usageBase
             : usageQuote
           : SharedData.long
-          ? usageQuote * (SharedData.profitBase ? 1 / d.lastPrice : 1)
-          : usageBase * (SharedData.profitBase ? 1 : d.lastPrice)) /
+            ? usageQuote * (SharedData.profitBase ? 1 / d.lastPrice : 1)
+            : usageBase * (SharedData.profitBase ? 1 : d.lastPrice)) /
         SharedData.leverage
       d.profit.perc = math.round((d.profit.total / denominator) * 100, 2)
       const precision = SharedData.precision.get(d.symbol.pair) ?? 8
@@ -2610,8 +2611,8 @@ export class DealManager {
               ? usageBase
               : usageQuote
             : SharedData.long
-            ? usageQuote * (SharedData.profitBase ? 1 / price : 1)
-            : usageBase * (SharedData.profitBase ? 1 : price)) /
+              ? usageQuote * (SharedData.profitBase ? 1 / price : 1)
+              : usageBase * (SharedData.profitBase ? 1 : price)) /
           SharedData.leverage
         const perc = total / denominator
         if (
@@ -2679,11 +2680,11 @@ export class DealManager {
       ) {
         const slConditionGt =
           (foundInSl
-            ? foundInSl?.unpnlCondition ?? SharedData.defaultUnpnlCondition
+            ? (foundInSl?.unpnlCondition ?? SharedData.defaultUnpnlCondition)
             : null) === IndicatorStartConditionEnum.gt
         const tpConditionGt =
           (foundInTp
-            ? foundInTp?.unpnlCondition ?? SharedData.defaultUnpnlCondition
+            ? (foundInTp?.unpnlCondition ?? SharedData.defaultUnpnlCondition)
             : null) === IndicatorStartConditionEnum.gt
 
         const slValue = (foundInSl?.unpnlValue ?? SharedData.defaultUnpnl) / 100
@@ -2723,19 +2724,19 @@ export class DealManager {
           (SharedData.combo || (d.trailingLevel && d.trailingMode)
             ? 1
             : SharedData.long
-            ? 1 + SharedData.userFee * 2
-            : 1 - SharedData.userFee * 2)
+              ? 1 + SharedData.userFee * 2
+              : 1 - SharedData.userFee * 2)
       const min = Math.min(b.low, b.close, b.open)
       const max = Math.max(b.high, b.close, b.open)
       slOrder.price = lock
         ? closePrice
         : slOrder.price >= min && slOrder.price <= max
-        ? slOrder.price
-        : slOrder.price >= max
-        ? max
-        : slOrder.price <= min
-        ? min
-        : min
+          ? slOrder.price
+          : slOrder.price >= max
+            ? max
+            : slOrder.price <= min
+              ? min
+              : min
       if (SharedData.combo && SharedData.profitBase) {
         slOrder = DealManager.getTP(d, slOrder.price, false, true)[0]
       }
@@ -2761,7 +2762,7 @@ export class DealManager {
           ? o.levelNumber
             ? o.levelNumber + 1
             : d.lastFilled
-          : o.levelNumber ?? d.lastFilled
+          : (o.levelNumber ?? d.lastFilled)
         if (SharedData.combo) {
           const m = DealManager.createMinigrid(d, o, false, d.symbol.pair)
           if (m) {
@@ -3041,8 +3042,8 @@ export class DealManager {
     const feeOrder = settings.futures
       ? undefined
       : typeof settings.feeOrder !== 'undefined' && settings.feeOrder
-      ? false
-      : undefined
+        ? false
+        : undefined
     const key = `${JSON.stringify(
       gridSettings,
     )}, ${true}, ${false}, ${!long}, ${feeOrder}, ${true}`
@@ -3062,7 +3063,7 @@ export class DealManager {
       type: DCAOrderTypeEnum.grid,
       relatedTo: minigrid.dcaOrderId,
       minigridId: minigrid.id,
-      id: !!local ? botFunctions.utils.id(20) : g.id,
+      id: local ? botFunctions.utils.id(20) : g.id,
     }))
     if (!local) {
       SharedData.gridsOnPrice.set(key, grids)
@@ -3097,8 +3098,8 @@ export class DealManager {
     const topPrice = SharedData.long ? startPrice + gridStep : startPrice
     const levels = Math.floor(
       +(baseOrder
-        ? settings.baseGridLevels ?? settings.gridLevel ?? '1'
-        : settings.gridLevel ?? '1'),
+        ? (settings.baseGridLevels ?? settings.gridLevel ?? '1')
+        : (settings.gridLevel ?? '1')),
     )
     const fee = userFee
     const sellDisplacement = fee * 2 * 100
@@ -3108,8 +3109,8 @@ export class DealManager {
         ? ('quote' as const)
         : ('base' as const)
       : settings.profitCurrency === 'quote'
-      ? ('base' as const)
-      : ('quote' as const)
+        ? ('base' as const)
+        : ('quote' as const)
     let asset = {
       base: 0,
       quote: 0,
@@ -3510,8 +3511,8 @@ export class DealManager {
           ? symbol.baseAsset.name
           : symbol.quoteAsset.name
         : SharedData.profitBase
-        ? symbol.baseAsset.name
-        : symbol.quoteAsset.name,
+          ? symbol.baseAsset.name
+          : symbol.quoteAsset.name,
       index: SharedData.transactionIndex,
       idBuy: o.side === BotOrderSideEnum.buy ? o.id : matchedId,
       idSell: o.side === BotOrderSideEnum.buy ? matchedId : o.id,
@@ -3869,10 +3870,10 @@ export class DealManager {
           (SharedData.settings.closeByTimerUnits === CooldownUnits.seconds
             ? 1000
             : SharedData.settings.closeByTimerUnits === CooldownUnits.minutes
-            ? 60 * 1000
-            : SharedData.settings.closeByTimerUnits === CooldownUnits.hours
-            ? 60 * 60 * 1000
-            : 24 * 60 * 60 * 1000)
+              ? 60 * 1000
+              : SharedData.settings.closeByTimerUnits === CooldownUnits.hours
+                ? 60 * 60 * 1000
+                : 24 * 60 * 60 * 1000)
       if (closeTime <= b.time) {
         const order = DealManager.getTP(d, b.open, true, false, closeTime)[0]
         StrategyUtils.updatePositionWithOrder(order, b.symbol)

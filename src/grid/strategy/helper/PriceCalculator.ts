@@ -13,9 +13,9 @@
  * @fileoverview Price calculation utilities for grid trading strategy
  */
 
-import findUSDRate from 'src/helper/price'
+import findUSDRate from '../../../helper/price'
 import { SharedData } from './SharedData'
-import { PositionSide } from 'src/types'
+import { PositionSide } from '../../../types'
 
 /**
  * Price calculation utilities for grid trading strategy
@@ -88,9 +88,9 @@ export class PriceCalculator {
               (position === PositionSide.LONG ? -1 : 1)) *
           (1 + SharedData.userFee * (position === PositionSide.LONG ? -1 : 1))
         : // Spot position calculation
-        position === PositionSide.LONG
-        ? SharedData.userFee
-        : 1 / SharedData.userFee)
+          position === PositionSide.LONG
+          ? SharedData.userFee
+          : 1 / SharedData.userFee)
     )
   }
 }

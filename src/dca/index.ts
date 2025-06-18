@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-var-requires */
+/* eslint-disable no-undef */
 import Backtesting from '../base'
 import { v4 } from 'uuid'
 

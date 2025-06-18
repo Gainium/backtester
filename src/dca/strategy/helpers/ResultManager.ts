@@ -64,11 +64,11 @@ import {
   PeriodicStats,
   StrategyEnum,
   SymbolStats,
-} from 'src/types'
+} from '../../../types'
 import { SharedData } from './SharedData'
-import { MathHelper } from 'src/helper/math'
+import { MathHelper } from '../../../helper/math'
 import { DealManager } from './DealManager'
-import { friendlyTime } from 'src/helper/timeFunctions'
+import { friendlyTime } from '../../../helper/timeFunctions'
 import { PriceCalculator } from './PriceCalculator'
 
 const math = new MathHelper()
@@ -84,11 +84,11 @@ export class ResultManager {
       return
     }
     const startPrice = SharedData.long
-      ? SharedData.maxPrice.get(s) ?? 0
-      : SharedData.minPrice.get(s) ?? 0
+      ? (SharedData.maxPrice.get(s) ?? 0)
+      : (SharedData.minPrice.get(s) ?? 0)
     const extremum = SharedData.long
-      ? SharedData.minPrice.get(s) ?? 0
-      : SharedData.maxPrice.get(s) ?? 0
+      ? (SharedData.minPrice.get(s) ?? 0)
+      : (SharedData.maxPrice.get(s) ?? 0)
     if (!startPrice || !extremum) {
       return
     }
@@ -128,16 +128,16 @@ export class ResultManager {
         number < 107
           ? 'F'
           : number >= 107 && number < 133
-          ? 'E'
-          : number >= 133 && number < 164
-          ? 'D'
-          : number >= 164 && number < 208
-          ? 'C'
-          : number >= 208 && number < 273
-          ? 'B'
-          : number >= 273 && number < 385
-          ? 'A'
-          : 'A+',
+            ? 'E'
+            : number >= 133 && number < 164
+              ? 'D'
+              : number >= 164 && number < 208
+                ? 'C'
+                : number >= 208 && number < 273
+                  ? 'B'
+                  : number >= 273 && number < 385
+                    ? 'A'
+                    : 'A+',
       number,
     }
   }
@@ -245,13 +245,13 @@ export class ResultManager {
                 ? v.usage.max.base
                 : v.usage.current.base
               : SharedData.combo
-              ? v.usage.max.quote
-              : v.usage.current.quote
+                ? v.usage.max.quote
+                : v.usage.current.quote
             : SharedData.long
-            ? (SharedData.combo ? v.usage.max.quote : v.usage.current.quote) *
-              (SharedData.profitBase ? 1 / v.startPrice : 1)
-            : (SharedData.combo ? v.usage.max.base : v.usage.current.base) *
-              (SharedData.profitBase ? 1 : v.startPrice)),
+              ? (SharedData.combo ? v.usage.max.quote : v.usage.current.quote) *
+                (SharedData.profitBase ? 1 / v.startPrice : 1)
+              : (SharedData.combo ? v.usage.max.base : v.usage.current.base) *
+                (SharedData.profitBase ? 1 : v.startPrice)),
         0,
       )
       x.push(day)
@@ -338,8 +338,8 @@ export class ResultManager {
                     ? (acc += d.qty)
                     : (acc += d.qty * d.price)
                   : !SharedData.long
-                  ? (acc += d.qty)
-                  : (acc += d.qty * d.price),
+                    ? (acc += d.qty)
+                    : (acc += d.qty * d.price),
               0,
             )
         : 0
@@ -429,8 +429,8 @@ export class ResultManager {
                     ? (acc += d.usage.current.base)
                     : (acc += d.usage.current.quote)
                   : !SharedData.long
-                  ? (acc += d.usage.current.base)
-                  : (acc += d.usage.current.quote),
+                    ? (acc += d.usage.current.base)
+                    : (acc += d.usage.current.quote),
               0,
             ) /
               allDeals.length /
@@ -524,15 +524,15 @@ export class ResultManager {
                   ? od.usage.max.base
                   : od.usage.max.quote
                 : SharedData.long
-                ? od.usage.max.quote
-                : od.usage.max.base
+                  ? od.usage.max.quote
+                  : od.usage.max.base
               : SharedData.futures
-              ? SharedData.coinm
-                ? od.usage.current.base
-                : od.usage.current.quote
-              : SharedData.long
-              ? od.usage.current.quote
-              : od.usage.current.base) /
+                ? SharedData.coinm
+                  ? od.usage.current.base
+                  : od.usage.current.quote
+                : SharedData.long
+                  ? od.usage.current.quote
+                  : od.usage.current.base) /
               SharedData.leverage) *
             PriceCalculator.getRate()
         }
@@ -637,8 +637,8 @@ export class ResultManager {
                         ? d.usage.current.base
                         : d.usage.current.quote
                       : !SharedData.long
-                      ? d.usage.current.base
-                      : d.usage.current.quote) / SharedData.leverage,
+                        ? d.usage.current.base
+                        : d.usage.current.quote) / SharedData.leverage,
                 ),
               ) *
               PriceCalculator.getRate() *
@@ -703,8 +703,8 @@ export class ResultManager {
                 : math.round((profitUsd / workingDays / maxSymbolValue) * 100),
           },
           profitAsset: SharedData.profitBase
-            ? symbol?.baseAsset?.name ?? ''
-            : symbol?.quoteAsset?.name ?? '',
+            ? (symbol?.baseAsset?.name ?? '')
+            : (symbol?.quoteAsset?.name ?? ''),
           winRate: closedDeals
             ? math.round((profitDealsStats.length / closedDealsStats) * 100)
             : 0,
@@ -903,8 +903,8 @@ export class ResultManager {
           ? quoteRate
           : 1
         : SharedData.settings.strategy === StrategyEnum.long
-        ? 1
-        : quoteRate) /
+          ? 1
+          : quoteRate) /
       (SharedData.settings.profitCurrency === 'base' ||
       SharedData.settings.coinm
         ? quoteRate

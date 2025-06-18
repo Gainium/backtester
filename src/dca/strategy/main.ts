@@ -457,8 +457,8 @@ export abstract class Strategy implements StrategyInterface {
           ? fullSymbol.baseAsset.name
           : fullSymbol.quoteAsset.name
         : SharedData.long
-        ? fullSymbol.quoteAsset.name
-        : fullSymbol.baseAsset.name
+          ? fullSymbol.quoteAsset.name
+          : fullSymbol.baseAsset.name
 
       // Open deal if no balance exists for this asset (first time setup)
       if (!SharedData.balance.has(k)) {

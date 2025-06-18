@@ -20,7 +20,7 @@
  * @fileoverview Comprehensive result calculation and analysis for grid strategy
  */
 
-import { MathHelper } from 'src/helper/math'
+import { MathHelper } from '../../../helper/math'
 import {
   BacktestingTransaction,
   Bar,
@@ -30,11 +30,11 @@ import {
   GridBacktestingResult,
   PositionSide,
   PreparedTransaction,
-} from 'src/types'
+} from '../../../types'
 import { SharedData } from './SharedData'
 import { PriceCalculator } from './PriceCalculator'
 import { TradeManager } from './TradeManager'
-import { friendlyTime } from 'src/helper/timeFunctions'
+import { friendlyTime } from '../../../helper/timeFunctions'
 
 const math = new MathHelper()
 
@@ -274,7 +274,7 @@ export class ResultManager {
               avgLine: o.avgLine,
             },
       ),
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+
       // @ts-ignore
       orders: [
         ...SharedData.smartGrids,
@@ -288,7 +288,7 @@ export class ResultManager {
                   sg.side === g.side,
               ),
           )
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+
           // @ts-ignore
           .map((g) => ({ ...g, side: 'GREY' }))
           .map((o) =>

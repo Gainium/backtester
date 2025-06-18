@@ -65,10 +65,10 @@ export class StrategyUtils {
       (units === CooldownUnits.seconds
         ? 1000
         : units === CooldownUnits.minutes
-        ? 60 * 1000
-        : units === CooldownUnits.hours
-        ? 60 * 60 * 1000
-        : 24 * 60 * 60 * 1000)
+          ? 60 * 1000
+          : units === CooldownUnits.hours
+            ? 60 * 60 * 1000
+            : 24 * 60 * 60 * 1000)
     )
   }
 
@@ -105,8 +105,8 @@ export class StrategyUtils {
               (pos === PositionSide.LONG ? -1 : 1) /* *
               (1 + StrategyUtils.userFee * (position === PositionSide.LONG ? 1 : -1)) */
           : pos === PositionSide.LONG
-          ? SharedData.userFee
-          : 1 / SharedData.userFee)
+            ? SharedData.userFee
+            : 1 / SharedData.userFee)
 
       if (sameDirection || position.qty === 0) {
         const entryPrice =
@@ -156,8 +156,8 @@ export class StrategyUtils {
         ? symbol.baseAsset.name
         : symbol.quoteAsset.name
       : SharedData.long
-      ? symbol.quoteAsset.name
-      : symbol.baseAsset.name
+        ? symbol.quoteAsset.name
+        : symbol.baseAsset.name
     const balanceAsset = (SharedData.balances ?? []).find(
       (b) => b.asset === asset,
     )
@@ -166,8 +166,8 @@ export class StrategyUtils {
     const free = SharedData.futures
       ? fullBalance
       : SharedData.long
-      ? balanceItem + SharedData.totalProfit * (SharedData.profitBase ? 0 : 1)
-      : balanceItem + SharedData.totalProfit * (SharedData.profitBase ? 1 : 0)
+        ? balanceItem + SharedData.totalProfit * (SharedData.profitBase ? 0 : 1)
+        : balanceItem + SharedData.totalProfit * (SharedData.profitBase ? 1 : 0)
     const balance = {
       asset,
       free: `${free}`,

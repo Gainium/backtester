@@ -12,7 +12,7 @@
  * @fileoverview Utility functions for grid trading strategy
  */
 
-import { BotOrderSideEnum, FullGrid, PositionSide } from 'src/types'
+import { BotOrderSideEnum, FullGrid, PositionSide } from '../../../types'
 import { SharedData } from './SharedData'
 import { PriceCalculator } from './PriceCalculator'
 

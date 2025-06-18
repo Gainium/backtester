@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-var-requires */
-/* eslint-disable @typescript-eslint/no-var-requires */
 import Backtesting from './base'
 
 // Re-export the base class and commonly used types and enums from types module

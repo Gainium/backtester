@@ -1,5 +1,4 @@
-/* eslint-disable @typescript-eslint/no-var-requires */
-
+/* eslint-disable no-undef */
 /**
  * Configuration options for the file reader
  */
@@ -141,6 +140,7 @@ export class FileReader {
    * @param _encoding - Encoding (ignored, for compatibility)
    * @returns Empty generator with warning
    */
+  // eslint-disable-next-line require-yield
   public *readLinesStub(
     _filename: string,
     _encoding?: BufferEncoding,

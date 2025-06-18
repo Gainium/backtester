@@ -177,7 +177,7 @@ export default class InternalIndicator {
    */
   private getIndicatorName(config: IndicatorConfigBackTesting): string {
     return config.type === IndicatorEnum.ma
-      ? config.maType ?? config.type
+      ? (config.maType ?? config.type)
       : config.type
   }
 
@@ -301,7 +301,7 @@ export default class InternalIndicator {
    */
   private calculateTotalLength(baseLength: number, config: any): number {
     const percentileLength = config.percentile
-      ? config.percentileLookback ?? 0
+      ? (config.percentileLookback ?? 0)
       : 0
     return baseLength + percentileLength + InternalIndicator.BASE_BUFFER
   }
@@ -452,10 +452,10 @@ export default class InternalIndicator {
     )
     const baseLength = Math.max(marConfig.mar1length, marConfig.mar2length)
     const percentileLength = marConfig.percentile
-      ? marConfig.percentileLookback ?? 0
+      ? (marConfig.percentileLookback ?? 0)
       : 0
     const trendFilterLength = marConfig.trendFilter
-      ? marConfig.trendFilterLookback ?? 0
+      ? (marConfig.trendFilterLookback ?? 0)
       : 0
     const length =
       baseLength +
@@ -1018,7 +1018,7 @@ export default class InternalIndicator {
           cb([...this.data])
         }
       }
-    } catch (error) {
+    } catch {
       // Handle any indicator processing errors gracefully
       cb([])
     }

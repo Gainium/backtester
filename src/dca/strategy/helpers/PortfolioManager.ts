@@ -1,4 +1,4 @@
-import { MathHelper } from 'src/helper/math'
+import { MathHelper } from '../../../helper/math'
 import { DealManager } from './DealManager'
 import { PriceCalculator } from './PriceCalculator'
 import { SharedData } from './SharedData'
@@ -7,7 +7,7 @@ import {
   FullBar,
   PositionSide,
   StartConditionEnum,
-} from 'src/types'
+} from '../../../types'
 
 const math = new MathHelper()
 
