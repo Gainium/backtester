@@ -1,6 +1,6 @@
 {
   "name": "@gainium/backtester",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "High-performance TypeScript backtesting engine for DCA and Grid trading strategies with comprehensive analytics and real-time optimization capabilities",
   "keywords": [
     "backtesting",
@@ -32,6 +32,22 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./dist/*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
+    "./dist/dca": {
+      "types": "./dist/dca/index.d.ts",
+      "default": "./dist/dca/index.js"
+    },
+    "./dist/grid": {
+      "types": "./dist/grid/index.d.ts",
+      "default": "./dist/grid/index.js"
+    },
+    "./dist/types": {
+      "types": "./dist/types.d.ts",
+      "default": "./dist/types.js"
     },
     "./dca": {
       "types": "./dist/dca/index.d.ts",
