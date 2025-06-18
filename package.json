@@ -1,6 +1,6 @@
 {
   "name": "@gainium/backtester",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "High-performance TypeScript backtesting engine for DCA and Grid trading strategies with comprehensive analytics and real-time optimization capabilities",
   "keywords": [
     "backtesting",
@@ -69,8 +69,8 @@
     "build": "tsc --project tsconfig.json",
     "build:watch": "tsc --project tsconfig.json --watch",
     "clean": "rm -rf dist",
-    "lint": "tsc --project tsconfig.json --noEmit",
-    "lint:fix": "prettier --write src examples",
+    "lint": "tsc --project tsconfig.json --noEmit && eslint . --cache",
+    "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -79,7 +79,10 @@
     "rebuild": "npm run clean && npm run build",
     "prepublishOnly": "npm run clean && npm run build",
     "pull": "git pull origin main",
-    "push": "git push origin main"
+    "push": "git push origin main",
+    "fullInit": "yarn update:indicators",
+    "build:indicators": "cd node_modules/@gainium/indicators && npm run build",
+    "update:indicators": "export GAINIUM_INDICATORS=@gainium/indicators && yarn remove $GAINIUM_INDICATORS && yarn cache clean $GAINIUM_INDICATORS && rm -rf node_modules/$GAINIUM_INDICATORS && yarn add $GAINIUM_INDICATORS@git+https://github.com/Gainium/indicators.git && export -n GAINIUM_INDICATORS"
   },
   "dependencies": {
     "@gainium/indicators": "git+https://github.com/Gainium/indicators.git",
