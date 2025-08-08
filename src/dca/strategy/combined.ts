@@ -1,4 +1,3 @@
-/* eslint-disable no-undef */
 import { Strategy, StrategyInterface } from './main'
 import type { StrategyInput } from './main'
 import type {

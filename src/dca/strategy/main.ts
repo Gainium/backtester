@@ -249,7 +249,7 @@ export abstract class Strategy implements StrategyInterface {
    * Reset all static data - primarily for testing and cleanup
    */
   static resetData() {
-    SharedData.resetData
+    SharedData.resetData()
   }
 
   /**
@@ -429,6 +429,12 @@ export abstract class Strategy implements StrategyInterface {
       return
     }
     SharedData.candleTimes.add(key)
+    if (SharedData.candleTimes.size > 100) {
+      const oldest = SharedData.candleTimes.keys().next().value
+      if (oldest) {
+        SharedData.candleTimes.delete(oldest)
+      }
+    }
 
     // Track price ranges for strategy analysis (non-multi mode)
     if (!SharedData.settings.useMulti && !SharedData.edge) {

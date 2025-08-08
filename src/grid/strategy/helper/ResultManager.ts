@@ -275,7 +275,7 @@ export class ResultManager {
             },
       ),
 
-      // @ts-ignore
+      // @ts-expect-error Enum
       orders: [
         ...SharedData.smartGrids,
         ...SharedData.grids
@@ -289,7 +289,6 @@ export class ResultManager {
               ),
           )
 
-          // @ts-ignore
           .map((g) => ({ ...g, side: 'GREY' }))
           .map((o) =>
             SharedData.fullResult

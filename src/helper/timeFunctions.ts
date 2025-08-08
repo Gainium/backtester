@@ -1,4 +1,3 @@
-/* eslint-disable no-redeclare */
 /**
  * Time and Date Utility Functions
  *

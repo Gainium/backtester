@@ -315,7 +315,6 @@ export class Strategy implements StrategyInterface {
       for (const p of [bar.close, bar.low, bar.high]) {
         const tpSl = TradeManager.tpSl(p)
         if (tpSl !== TpSlReturn.none) {
-          tpSl
           return TradeManager.closeBot(p, bar.time, tpSl)
         }
       }

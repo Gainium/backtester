@@ -1472,7 +1472,7 @@ class TIStrategy extends Strategy implements StrategyInterface {
                 (ii) => ii.id === `${maUUID}@${nextBar.symbol}`,
               )
               if (findMA) {
-                let [_, dataMA, prevMAData] = [
+                let [, dataMA, prevMAData] = [
                   ...findMA.instance.currentData,
                 ].sort((a, b) => b.time - a.time)
                 if (
@@ -1512,7 +1512,7 @@ class TIStrategy extends Strategy implements StrategyInterface {
               (ii) => ii.id === `${xoUUID}@${nextBar.symbol}`,
             )
             if (findXO) {
-              let [_, dataXO, prevXOData] = [
+              let [, dataXO, prevXOData] = [
                 ...findXO.instance.currentData,
               ].sort((a, b) => b.time - a.time)
               if (

@@ -1,6 +1,6 @@
 {
   "name": "@gainium/backtester",
-  "version": "1.0.6",
+  "version": "1.0.10",
   "description": "High-performance TypeScript backtesting engine for DCA and Grid trading strategies with comprehensive analytics and real-time optimization capabilities",
   "keywords": [
     "backtesting",
@@ -70,51 +70,46 @@
     "README.md",
     "LICENSE"
   ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Gainium/backtester.git"
-  },
-  "bugs": {
-    "url": "https://github.com/Gainium/backtester/issues"
-  },
-  "homepage": "https://github.com/Gainium/backtester#readme",
-  "engines": {
-    "node": ">=16.0.0"
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
+    "@eslint/js": "^9.30.1",
+    "@types/node": "^24.0.10",
+    "@types/uuid": "^10.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.35.1",
+    "@typescript-eslint/parser": "^8.35.1",
+    "eslint": "^9.30.1",
+    "eslint-config-prettier": "^10.1.5",
+    "eslint-plugin-prettier": "^5.5.1",
+    "eslint-plugin-unused-imports": "^4.1.4",
+    "globals": "^16.3.0",
+    "husky": "^9.1.7",
+    "prettier": "^3.6.2",
+    "typescript": "^5.8.3",
+    "uuid": "^11.1.0"
   },
   "scripts": {
     "build": "tsc --project tsconfig.json",
+    "build:clean": "rm -rf dist && npm run build",
     "build:watch": "tsc --project tsconfig.json --watch",
-    "clean": "rm -rf dist",
     "lint": "tsc --project tsconfig.json --noEmit && eslint . --cache",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "postinstall": "./scripts/build-if-needed.sh",
-    "build:if-needed": "./scripts/build-if-needed.sh",
     "rebuild": "npm run clean && npm run build",
     "prepublishOnly": "npm run clean && npm run build",
     "pull": "git pull origin main",
     "push": "git push origin main",
     "fullInit": "yarn update:indicators",
     "build:indicators": "cd node_modules/@gainium/indicators && npm run build",
-    "update:indicators": "export GAINIUM_INDICATORS=@gainium/indicators && yarn remove $GAINIUM_INDICATORS && yarn cache clean $GAINIUM_INDICATORS && rm -rf node_modules/$GAINIUM_INDICATORS && yarn add $GAINIUM_INDICATORS@git+https://github.com/Gainium/indicators.git && export -n GAINIUM_INDICATORS"
+    "update:indicators": "export GAINIUM_INDICATORS=@gainium/indicators && npm uninstall $GAINIUM_INDICATORS && npm cache clean --force && rm -rf node_modules/$GAINIUM_INDICATORS && npm install $GAINIUM_INDICATORS@git+https://github.com/Gainium/indicators.git && unset GAINIUM_INDICATORS",
+    "postinstall": "npm run build:if-needed",
+    "build:if-needed": "npm run build",
+    "prepare": "husky"
   },
   "dependencies": {
-    "@gainium/indicators": "git+https://github.com/Gainium/indicators.git",
-    "csv-parser": "^3.0.0",
-    "external-sorting": "^1.3.1",
-    "uuid": "^9.0.0"
-  },
-  "devDependencies": {
-    "@types/node": "^22.15.24",
-    "@types/uuid": "^9.0.8",
-    "@typescript-eslint/eslint-plugin": "^8.33.0",
-    "@typescript-eslint/parser": "^8.33.0",
-    "eslint": "^9.27.0",
-    "eslint-config-prettier": "^10.1.5",
-    "eslint-plugin-prettier": "^5.4.0",
-    "prettier": "^3.5.3",
-    "typescript": "^5.8.3"
+    "@gainium/indicators": "github:Gainium/indicators",
+    "csv-parser": "^3.2.0",
+    "external-sorting": "^1.3.1"
   }
 }

@@ -26,7 +26,7 @@ export class OptimizedPriceCalculator {
     }
 
     // Single iteration instead of multiple filter/reduce chains
-    const orders = deal ? deal.filledOrders : minigrid?.filledOrders ?? []
+    const orders = deal ? deal.filledOrders : (minigrid?.filledOrders ?? [])
     for (const order of orders) {
       // Early continue instead of multiple filters
       if (order.side !== targetSide) continue

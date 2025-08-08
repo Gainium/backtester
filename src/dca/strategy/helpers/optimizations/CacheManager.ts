@@ -172,10 +172,10 @@ export class CacheManager {
       type === 'base'
         ? s.baseAsset.name
         : type === 'quote'
-        ? s.quoteAsset.name
-        : SharedData.profitBase
-        ? s.baseAsset.name
-        : s.quoteAsset.name,
+          ? s.quoteAsset.name
+          : SharedData.profitBase
+            ? s.baseAsset.name
+            : s.quoteAsset.name,
       [
         { symbol, price },
         ...SharedData.prices.filter((p) => p.symbol !== symbol),

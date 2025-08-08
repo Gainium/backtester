@@ -215,11 +215,11 @@ export class PriceCalculator {
     return SharedData.futures
       ? usdRate
       : SharedData.long
-      ? SharedData.profitBase
-        ? usdRateQuote
-        : usdRate
-      : SharedData.profitBase
-      ? usdRate
-      : usdRateBase
+        ? SharedData.profitBase
+          ? usdRateQuote
+          : usdRate
+        : SharedData.profitBase
+          ? usdRate
+          : usdRateBase
   }
 }

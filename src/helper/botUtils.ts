@@ -249,7 +249,7 @@ class BotUtils {
    * @returns Object with sell/buy counts and filtered price arrays
    */
   getSellBuyCount(
-    prices: ReturnType<typeof this.getPrices>,
+    prices: { buy: number; sell: number }[],
     {
       useStartPrice,
       startPrice,

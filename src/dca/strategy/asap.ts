@@ -231,11 +231,11 @@ class ASAPStrategy extends Strategy implements StrategyInterface {
       this.settings.dynamicPriceFilterPriceType
     )
 
-    let maxDeals = this.parsePositiveNumber(
+    const maxDeals = this.parsePositiveNumber(
       this.settings.maxNumberOfOpenDeals,
       1,
     )
-    let maxPerSymbol = multi
+    const maxPerSymbol = multi
       ? this.parsePositiveNumber(this.settings.maxDealsPerPair, 1)
       : 1
 
