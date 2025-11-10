@@ -53,6 +53,7 @@ export enum IndicatorEnum {
   unpnl = 'UNPNL',
   dc = 'DC',
   obfvg = 'OBFVG',
+  sessions = 'SESSIONS',
 }
 
 export enum ECDTriggerEnum {
@@ -535,6 +536,27 @@ export type SettingsIndicators = {
   dcValue?: DCValueEnum
   obfvgValue?: OBFVGValueEnum
   obfvgRef?: OBFVGRefEnum
+  enableSunday?: boolean
+  sundayStart?: string
+  sundayEnd?: string
+  enableMonday?: boolean
+  mondayStart?: string
+  mondayEnd?: string
+  enableTuesday?: boolean
+  tuesdayStart?: string
+  tuesdayEnd?: string
+  enableWednesday?: boolean
+  wednesdayStart?: string
+  wednesdayEnd?: string
+  enableThursday?: boolean
+  thursdayStart?: string
+  thursdayEnd?: string
+  enableFriday?: boolean
+  fridayStart?: string
+  fridayEnd?: string
+  enableSaturday?: boolean
+  saturdayStart?: string
+  saturdayEnd?: string
 }
 
 export enum OBFVGValueEnum {
