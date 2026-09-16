@@ -5,6 +5,21 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.7] - 2026-09-16
+
+### Fixed
+
+- Grid backtest, futures: when a bot stops on a reached TP/SL price with the
+  `stop and sell` action, the resulting position close is now recorded in the
+  Transactions list. Its P&L was previously added to the totals without a
+  matching transaction row, so the list ended on the last grid fill and did
+  not add up to the reported total profit — the closing trade, usually a loss,
+  was invisible. Total profit and value change are unchanged; the close now
+  also counts toward the transaction counters, the average transaction profit
+  and the Sharpe/Sortino ratios. Spot grids are
+  unaffected: there the close converts the remaining inventory and was already
+  reflected in the value change.
+
 ## [1.6.6] - 2026-09-03
 
 ### Added
