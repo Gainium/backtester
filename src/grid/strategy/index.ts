@@ -1235,16 +1235,13 @@ export class Strategy implements StrategyInterface {
         if (lastPrice <= +tpTopPrice) {
           return TpSlReturn.tp
         }
-      } else if (
-        slCondition === 'priceReached' &&
-        slLowPrice &&
-        sl &&
-        this.isShort
-      ) {
-        if (lastPrice <= +slLowPrice) {
+      }
+      if (slCondition === 'priceReached' && slLowPrice && sl && this.isShort) {
+        if (lastPrice >= +slLowPrice) {
           return TpSlReturn.sl
         }
-      } else if (
+      }
+      if (
         tpSlCondition === 'priceReached' &&
         tpTopPrice &&
         tpSl &&
@@ -1253,16 +1250,13 @@ export class Strategy implements StrategyInterface {
         if (lastPrice >= +tpTopPrice) {
           return TpSlReturn.tp
         }
-      } else if (
-        slCondition === 'priceReached' &&
-        slLowPrice &&
-        sl &&
-        !this.isShort
-      ) {
+      }
+      if (slCondition === 'priceReached' && slLowPrice && sl && !this.isShort) {
         if (lastPrice <= +slLowPrice) {
           return TpSlReturn.sl
         }
-      } else if (
+      }
+      if (
         (tpSlCondition === 'valueChanged' &&
           tpPerc &&
           initialPriceStart &&

@@ -5,6 +5,22 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.8] - 2026-09-18
+
+### Fixed
+
+- Grid backtest: a stop-loss set as a reached price is now evaluated on every
+  price point, even when a take-profit price is configured on the same bot.
+  The two rules were chained, so the take-profit claimed the check and the
+  stop-loss was never reached — a grid backtest with both prices set simply
+  ran on through its stop-loss price and kept trading. Mixed setups (one rule
+  by price, the other by value change) were unreachable the same way. The
+  take-profit keeps priority when both apply.
+- Grid backtest, short grids: the stop-loss now triggers when price rises
+  through the stop price, matching the live bot engine. It was comparing in
+  the wrong direction, which would stop a short grid in its profitable
+  direction, typically on the first candle.
+
 ## [1.6.7] - 2026-09-16
 
 ### Fixed
