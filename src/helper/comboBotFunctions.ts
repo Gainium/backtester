@@ -195,7 +195,7 @@ class ComboBotFunctions extends DcaBotFunctions {
         )
       }
     }
-    const mod = baseOrder.qty % symbol.baseAsset.step
+    const mod = this.math.gridRemainder(baseOrder.qty, symbol.baseAsset.step)
     if (mod > Number.EPSILON) {
       baseOrder.qty = this.math.round(
         baseOrder.qty - mod + symbol.baseAsset.step,

@@ -313,7 +313,7 @@ class DCABotFunctions {
         )
       }
     }
-    const mod = baseOrder.qty % symbol.baseAsset.step
+    const mod = this.math.gridRemainder(baseOrder.qty, symbol.baseAsset.step)
     if (mod > Number.EPSILON) {
       baseOrder.qty = this.math.round(
         baseOrder.qty - mod + symbol.baseAsset.step,
@@ -713,7 +713,7 @@ class DCABotFunctions {
             )
           }
         }
-        const modQty = qty % symbol.baseAsset.step
+        const modQty = this.math.gridRemainder(qty, symbol.baseAsset.step)
         if (modQty !== 0) {
           qty = this.math.round(
             qty - modQty + symbol.baseAsset.step,

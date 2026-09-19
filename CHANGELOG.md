@@ -5,6 +5,31 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.9] - 2026-09-19
+
+### Fixed
+
+- Order sizing: an order quantity that is already a whole number of the
+  symbol's lot steps is no longer rounded up by another whole lot. The order
+  builders tested the quantity against the lot step with a floating-point
+  remainder, which does not read an already-aligned quantity as zero
+  (`0.145 % 0.001` is `0.000999…`), so the round-up fired on a quantity that
+  needed no rounding and the ceil at the step's precision turned that
+  fractional hair into a full extra lot — a 10 000 USDT order at 68 571.5 on a
+  0.001 lot step was sized 0.146 instead of the 0.145 the budget allows. This
+  covers the DCA base order and safety orders, the combo base order and grid
+  orders. The live bot engine has always rounded this correctly, so a backtest
+  could show a larger position than the same bot would actually open. A
+  genuinely off-grid quantity still rounds up to the next step as before.
+- Grid order sizing no longer depends on which backtest mode is running. The
+  trades-based and candle-based runs used two different remainders for the
+  same check and misread different quantities, so the same grid could come out
+  with different order quantities in each.
+
+Backtest results move where the defect used to fire: those orders are now one
+lot smaller, so the affected deals open slightly smaller positions and report
+slightly different profit. Results that were already correct are unchanged.
+
 ## [1.6.8] - 2026-09-18
 
 ### Fixed
