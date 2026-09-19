@@ -5,6 +5,34 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.10] - 2026-09-19
+
+### Fixed
+
+- DCA backtest: an indicator that carries no id is evaluated like any other.
+  The engine keys each indicator as `<id>@<pair>` and, when it assembles the
+  set of indicators to evaluate on a bar, dropped the helper legs of an MA or
+  XO crossing by rebuilding what their key would be and comparing the strings.
+  An indicator with no id of its own has exactly the key that comparison
+  builds, so it matched its own exclusion rule, was never evaluated, and every
+  condition group containing it stayed false — the backtest finished with no
+  deals and no error, which reads as a strategy that simply never trades. The
+  same collision hit any indicator whose own id happened to equal the id of its
+  crossing leg. The set is now taken from the flag the engine already sets when
+  it registers a helper leg, so the question is asked once instead of
+  reconstructed. (The second half of the old comparison was a bare string and
+  always true, so it tested nothing; it is gone with it.)
+- DCA backtest: two indicators that both arrive without an id no longer share
+  one key. Indicator data, statuses and next-bar times are written back by key,
+  so the two overwrote each other and an AND of them did not behave as an AND.
+  Every indicator is now given an id before the run if it has none, which also
+  keeps dynamic average-range levels matching their indicator.
+
+Indicators built in the dashboard always carry an id, so backtest results for
+those bots are unchanged. The case that moves is a backtest run on settings
+assembled outside the dashboard — it used to come back with zero deals and now
+returns the same deals the identical rules give with ids.
+
 ## [1.6.9] - 2026-09-19
 
 ### Fixed

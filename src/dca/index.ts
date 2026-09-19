@@ -16,6 +16,8 @@ import {
 
 import getStrategyBySettings, { StrategyInterface } from './strategy'
 
+import { withIndicatorIds } from '../helper/utils'
+
 import CombinedStrategy from './strategy/combined'
 
 import {
@@ -37,7 +39,7 @@ class DCABacktesting extends Backtesting {
   private edge?: EdgeBacktestEnum
 
   constructor({
-    settings,
+    settings: inputSettings,
     userFee,
     symbols,
     prices,
@@ -54,6 +56,7 @@ class DCABacktesting extends Backtesting {
     fullResult,
     ...rest
   }: DCABacktestingInput) {
+    const settings = withIndicatorIds(inputSettings)
     const candleInterval = interval ?? ExchangeIntervals.fiveM
     super(
       {
