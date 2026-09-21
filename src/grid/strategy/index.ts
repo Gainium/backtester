@@ -1339,19 +1339,27 @@ export class Strategy implements StrategyInterface {
     ) {
       if (this.futures) {
         const current = this.position
-        const diff =
-          ((price - current.entryPrice) *
-            (current.side === PositionSide.LONG ? 1 : -1)) /
-          current.entryPrice
-        const profit = this.coinm
-          ? current.qty * diff
-          : current.qty * current.entryPrice * diff
+        // A force close can land on a bar where the net position is flat — a
+        // neutral grid passes through qty 0 whenever its legs are all matched.
+        // Dividing by entryPrice 0 there makes diff Infinity and profit NaN,
+        // which poisons totalProfit and zeroes the whole reported result.
+        const hasPosition = current.qty > 0 && current.entryPrice > 0
+        const diff = hasPosition
+          ? ((price - current.entryPrice) *
+              (current.side === PositionSide.LONG ? 1 : -1)) /
+            current.entryPrice
+          : 0
+        const profit = hasPosition
+          ? this.coinm
+            ? current.qty * diff
+            : current.qty * current.entryPrice * diff
+          : 0
         const profitUsd = profit * (this.coinm ? price : 1) * this.usdRateQuote
         // The force close is a real order — file it in the ledger with the P&L
         // accrued just below, matched against the position price the same way a
         // directional futures fill is, so the Transactions list reconciles with
         // profitTotal instead of ending on the last grid fill.
-        if (current.qty > 0 && current.entryPrice > 0) {
+        if (hasPosition) {
           const side =
             current.side === PositionSide.LONG
               ? BotOrderSideEnum.sell

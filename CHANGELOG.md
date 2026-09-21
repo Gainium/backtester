@@ -5,6 +5,32 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.11] - 2026-09-21
+
+### Fixed
+
+- Grid backtest: a futures bot that stops on a `stopAndSell` take-profit or
+  stop-loss while its net position is flat no longer wipes the result. The
+  force close computed its P&L from the position's entry price, and with no
+  position that price is zero — the division gave `Infinity`, the profit came
+  out `NaN`, and every figure derived from it afterwards was `NaN` rounded to
+  `0` on the way out. A backtest with booked transactions and real profit
+  reported `0` profit, `0` value change and a `0` balance, with no error to say
+  so. A flat close now contributes nothing, which is what it is worth, and the
+  run reports what it earned up to that point. A neutral grid reaches a flat
+  position whenever its open legs are all matched, so any stop landing on one
+  of those bars was affected.
+- Grid backtest: a run whose take-profit or stop-loss triggers before a single
+  grid order fills now reports the budget it never spent, instead of a zero
+  balance against a full starting balance. This happens when a `priceReached`
+  trigger is set on the wrong side of the start price — the bot correctly stops
+  on the first candle, and the result now says so rather than looking like a
+  backtest that produced nothing.
+
+Runs whose force close had an open position are unchanged, as are the
+transaction rows in every case — a flat close still books no row, because there
+is no order to record.
+
 ## [1.6.10] - 2026-09-19
 
 ### Fixed
