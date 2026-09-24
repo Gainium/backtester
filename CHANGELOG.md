@@ -5,6 +5,18 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.14] - 2026-09-24
+
+### Fixed
+
+- **Combo safety-order prices no longer accumulate rounding error across levels.** The combo ladder measured each level from the previous level's rounded price, so on a coarse tick a 30 × 1% ladder ended 24–36% from the start instead of 30%. Each level is now computed from the unrounded distance to the start and rounded once, matching the live combo engine. Mini-grid widths are unchanged.
+
+## [1.6.13] - 2026-09-24
+
+### Fixed
+
+- **DCA safety-order prices no longer accumulate rounding error across levels.** A percentage ladder rounded each level to the price tick and measured the next level from the rounded price, so on a coarse tick (0.001 at a price near 0.25) a 30 × 1% ladder ended 24–36% below the start instead of 30%. Each level is now computed from the unrounded distance to the start and rounded once, matching the live bot engine. Indicator, custom-step and ATR/ADR ladders are unchanged.
+
 ## [1.6.12] - 2026-09-22
 
 ### Changed
