@@ -5,6 +5,12 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-09-25
+
+### Added
+
+- **Stop the bot after X consecutive winning or losing deals.** Two new bot-controller settings, `useCloseAfterXconsecutiveWin` / `closeAfterXconsecutiveWin` and `useCloseAfterXconsecutiveLoss` / `closeAfterXconsecutiveLoss`, stop a DCA or combo bot from opening further deals once its closed deals end in a run of that many wins or losses. Unlike the existing `closeAfterXwin` / `closeAfterXloss` totals, the run resets on the first opposite outcome. Deals are read in `closedTime` order so a multi-pair bot's interleaved closes are counted in the order they actually finished, and a breakeven deal counts as a loss — the same split the cumulative counters use. Both settings are off by default and change nothing for existing backtests.
+
 ## [1.6.14] - 2026-09-24
 
 ### Fixed

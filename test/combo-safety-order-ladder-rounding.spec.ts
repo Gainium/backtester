@@ -151,11 +151,17 @@ describe('combo safety-order ladder rounding', () => {
         0.001,
       )
       const ranges: { low: number; top: number }[] = []
-      const createGridOrders = bot.utils.createGridOrders.bind(bot.utils)
-      bot.utils.createGridOrders = ((s: any, ...rest: any[]) => {
+      type CreateGridOrders = typeof bot.utils.createGridOrders
+      const createGridOrders = bot.utils.createGridOrders.bind(
+        bot.utils,
+      ) as CreateGridOrders
+      bot.utils.createGridOrders = ((
+        s: Parameters<CreateGridOrders>[0],
+        ...rest: unknown[]
+      ) => {
         ranges.push({ low: +s.lowPrice, top: +s.topPrice })
-        return (createGridOrders as any)(s, ...rest)
-      }) as typeof bot.utils.createGridOrders
+        return (createGridOrders as (...a: unknown[]) => unknown)(s, ...rest)
+      }) as CreateGridOrders
       const orders = safetyOrders(bot.createOrders(1, 0.254, true))
       expect(orders.length).to.equal(10)
       orders.forEach((o, idx) => {
@@ -166,7 +172,8 @@ describe('combo safety-order ladder rounding', () => {
             : [o.price - width, o.price]
         expect(
           ranges.some(
-            (r) => Math.abs(r.low - low) < 1e-12 && Math.abs(r.top - top) < 1e-12,
+            (r) =>
+              Math.abs(r.low - low) < 1e-12 && Math.abs(r.top - top) < 1e-12,
           ),
           `${strategy} SO${idx + 1} mini-grid [${low}, ${top}]`,
         ).to.equal(true)

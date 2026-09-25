@@ -1,6 +1,10 @@
 import { v4 } from 'uuid'
 import { StrategyContextManager } from './context'
 import { checkNumber } from '../../helper/utils'
+import {
+  closedOutcomesNewestFirst,
+  hasConsecutiveStreak,
+} from '../../helper/consecutiveStreak'
 import DCABotFunctions from '../../helper/dcaBotFunctions'
 import ComboBotFunctions from '../../helper/comboBotFunctions'
 import {
@@ -2109,6 +2113,22 @@ export abstract class Strategy implements StrategyInterface {
         IndicatorStartConditionEnum.gt
           ? val < +this.settings.closeAfterXprofitValue
           : val > +this.settings.closeAfterXprofitValue)
+      }
+      const consecutiveWinTarget =
+        this.settings.useCloseAfterXconsecutiveWin &&
+        this.settings.closeAfterXconsecutiveWin
+          ? +this.settings.closeAfterXconsecutiveWin
+          : 0
+      const consecutiveLossTarget =
+        this.settings.useCloseAfterXconsecutiveLoss &&
+        this.settings.closeAfterXconsecutiveLoss
+          ? +this.settings.closeAfterXconsecutiveLoss
+          : 0
+      if ((consecutiveWinTarget || consecutiveLossTarget) && !close) {
+        const outcomes = closedOutcomesNewestFirst(Strategy.getDeals('closed'))
+        close =
+          hasConsecutiveStreak(outcomes, true, consecutiveWinTarget) ||
+          hasConsecutiveStreak(outcomes, false, consecutiveLossTarget)
       }
       if (this.settings.useCloseAfterX && this.settings.closeAfterX && !close) {
         close = !(Strategy.getDealsCount('closed') < +this.settings.closeAfterX)
