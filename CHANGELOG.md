@@ -5,6 +5,12 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2026-10-01
+
+### Fixed
+
+- **An ATR/ADR stop loss no longer stops a DCA backtest from opening deals.** When the bot did not start on indicators and its only indicator need was an ATR/ADR stop loss (`dealCloseConditionSL: 'dynamicAr'` with `useSl`), the engine decided whether to evaluate indicators by checking the take-profit condition instead of the stop-loss one. No indicator was evaluated, the ATR/ADR level the deal needs was never available, and every deal was refused, so the backtest reported 0 deals. The stop-loss condition is now checked, and the stop is placed from the ATR/ADR value. Bots that use ATR/ADR for take profit or for safety orders were not affected.
+
 ## [1.7.0] - 2026-09-25
 
 ### Added
