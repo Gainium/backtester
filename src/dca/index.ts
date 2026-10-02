@@ -26,6 +26,8 @@ import {
   EdgeBacktestEnum,
   TradeResponse,
   DirName,
+  Deal,
+  DealSettingsOverride,
 } from '../types'
 
 class DCABacktesting extends Backtesting {
@@ -54,6 +56,7 @@ class DCABacktesting extends Backtesting {
     timezone,
     useFile,
     fullResult,
+    hooks,
     ...rest
   }: DCABacktestingInput) {
     const settings = withIndicatorIds(inputSettings)
@@ -95,6 +98,8 @@ class DCABacktesting extends Backtesting {
           useFile,
           fullResult,
           exchange: this.exchange,
+          // 1.8.0 — undefined unless a host passes hooks
+          hooks,
         },
         this.fileName,
         ...strategy,
@@ -437,6 +442,47 @@ class DCABacktesting extends Backtesting {
     await this.strategy.preTest()
 
     return true
+  }
+
+  // ─── host control (1.8.0) — used only by a host that set `hooks` ──────────
+
+  /** Open deals as the engine holds them (read only). */
+  public hostOpenDeals(): Deal[] {
+    return this.strategy?.hostOpenDeals() ?? []
+  }
+
+  /** Every deal, open and closed, as the engine holds them (read only). */
+  public hostAllDeals(): Deal[] {
+    return this.strategy?.hostAllDeals() ?? []
+  }
+
+  /** The engine's last price of a pair (the close of its last bar). */
+  public hostLastPrice(symbol: string): number | undefined {
+    return this.strategy?.hostLastPrice(symbol)
+  }
+
+  /** Per-deal values (a deal settings override); TP / stop follow at once. */
+  public hostSetDealSettings(
+    dealId: string,
+    override: DealSettingsOverride,
+    time: number,
+  ): boolean {
+    return this.strategy?.hostSetDealSettings(dealId, override, time) ?? false
+  }
+
+  /** Bot settings for deals opened from now on; open deals keep theirs. */
+  public hostSetBotSettings(partial: DealSettingsOverride): void {
+    this.strategy?.hostSetBotSettings(partial)
+  }
+
+  /** Closes one open deal at `price` (market close). */
+  public hostCloseDeal(dealId: string, price: number, time: number): boolean {
+    return this.strategy?.hostCloseDeal(dealId, price, time) ?? false
+  }
+
+  /** The bot settings the engine runs with (live object — do not mutate). */
+  public hostSettings(): DCABotSettings {
+    return this.settings
   }
 
   // Getters for hedge access

@@ -5,6 +5,13 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-10-02
+
+### Added
+
+- **Optional host hooks for server-side runners.** `DCABacktestingInput.hooks` takes three synchronous callbacks: `approveNewDeal` (asked after every engine gate passed, right where a deal would open — `false` refuses it), `approveDealClose` (asked for an indicator take-profit close signal after the minimum-profit check — `false` keeps the deal open) and `afterBar` (called once every bar of the lowest interval at a time has been processed). A hook that throws approves. Without `hooks` the engine runs exactly as before; a parity test compares six configurations with golden results from 1.7.1, with and without approve-all hooks.
+- **Host control of a running backtest.** `hostOpenDeals`, `hostAllDeals`, `hostLastPrice`, `hostSetDealSettings` (per-deal take profit, stop loss and trailing values — a deal settings override; the take-profit orders and the stop line follow at once), `hostSetBotSettings` (for deals opened from then on; open deals keep their values) and `hostCloseDeal` (a market close of one deal). Every take-profit / stop-loss read of a deal goes through the deal's effective settings, which are the bot's settings object itself when the deal has no override.
+
 ## [1.7.1] - 2026-10-01
 
 ### Fixed
