@@ -294,6 +294,42 @@ describe('engine hooks — host answers and actions (1.8.0)', () => {
     expect(first.profit.perc).to.be.greaterThan(-2)
   })
 
+  it("hostSetDealSettings: a deal's stop switched on as a price stop fires even when the bot's stop condition is not price", async () => {
+    // the bot's stop is off and its stored close condition is 'manual' (what a
+    // form keeps while the stop is off); the host sets the deal's own condition
+    const switchOn = (override: Record<string, unknown>) => {
+      let done = false
+      return run(
+        make(
+          {
+            useDca: false,
+            tpPerc: '30',
+            dealCloseConditionSL: CloseConditionEnum.manual,
+          },
+          (bt) => ({
+            afterBar: (ctx) => {
+              if (done) return
+              const open = bt().hostOpenDeals()[0]
+              if (!open) return
+              done = true
+              bt().hostSetDealSettings(open.id, override, ctx.time)
+            },
+          }),
+        ),
+      )
+    }
+    const priced = await switchOn({
+      useSl: true,
+      slPerc: '-1',
+      dealCloseConditionSL: CloseConditionEnum.tp,
+    })
+    expect(priced.deals[0].status).to.equal('closed')
+    expect(priced.deals[0].profit.perc).to.be.lessThan(-0.9)
+    // the deal's condition still says manual: its percent stop does not fire
+    const manual = await switchOn({ useSl: true, slPerc: '-1' })
+    expect(manual.deals[0].profit.perc).to.not.be.lessThan(-0.9)
+  })
+
   it('hostSetBotSettings changes new deals only; the open deal keeps its take profit', async () => {
     let changedAt = 0
     let openTp = 0

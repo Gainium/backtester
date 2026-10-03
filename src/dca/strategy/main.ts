@@ -2180,7 +2180,7 @@ export abstract class Strategy implements StrategyInterface {
     const trailing = this.dealTrailing(deal, botFunctions)
     if (
       this.dealSettings(deal).useSl &&
-      this.settings.dealCloseConditionSL === CloseConditionEnum.tp
+      this.dealSettings(deal).dealCloseConditionSL === CloseConditionEnum.tp
     ) {
       if (
         !trailing.sl &&
@@ -4218,7 +4218,7 @@ export abstract class Strategy implements StrategyInterface {
     const trailing = this.dealTrailing(d, botFunctions)
     const dealSettings = this.dealSettings(d)
     if (
-      this.settings.dealCloseConditionSL !== CloseConditionEnum.tp &&
+      dealSettings.dealCloseConditionSL !== CloseConditionEnum.tp &&
       !this.slAr &&
       !this.settings.useRiskReward &&
       !Strategy.combo &&
@@ -4317,7 +4317,9 @@ export abstract class Strategy implements StrategyInterface {
     } else if (
       dealSettings.useSl &&
       typeof d.slPerc !== 'undefined' &&
-      (this.settings.dealCloseConditionSL === CloseConditionEnum.tp ||
+      // the deal's own stop condition: a host may switch a deal's stop on
+      // as a price stop while the bot's stop is off (any stored condition)
+      (dealSettings.dealCloseConditionSL === CloseConditionEnum.tp ||
         (this.settings.moveSL && d.moveSlActivated)) &&
       !Strategy.combo
     ) {
@@ -4362,7 +4364,7 @@ export abstract class Strategy implements StrategyInterface {
           this.settings.dealCloseCondition === CloseConditionEnum.tp
         const useSl =
           dealSettings.useSl &&
-          this.settings.dealCloseConditionSL === CloseConditionEnum.tp
+          dealSettings.dealCloseConditionSL === CloseConditionEnum.tp
         const price = b.close
         const qty = Math.max(
           this.long
