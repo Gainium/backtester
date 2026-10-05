@@ -1320,6 +1320,8 @@ export type Deal = {
   lastIndex: number
   dynamicAr?: DynamicArPrices[]
   sizes?: Sizes
+  /** 1.9.0 — the size multiplier a host approval applied (absent = 1) */
+  sizeMultiplier?: number
   /** 1.8.0 — values a host set on this deal; absent = the bot's settings */
   settingsOverride?: DealSettingsOverride
 }
@@ -1444,8 +1446,20 @@ export type BarHookContext = {
  * answer on the same bar, exactly where it would have acted. `true` (or a hook
  * that throws) is the engine's own behaviour.
  */
+/**
+ * 1.9.0 — an approval may carry a size multiplier for the new deal: its base
+ * order and every safety order are scaled by it (base / quote / usd size types,
+ * not with risk/reward sizing; 0.1–3). A plain boolean still works.
+ */
+export type NewDealApprovalAnswer = {
+  approve: boolean
+  sizeMultiplier?: number
+}
+
 export type DCABacktestHooks = {
-  approveNewDeal?: (ctx: NewDealApprovalContext) => boolean
+  approveNewDeal?: (
+    ctx: NewDealApprovalContext,
+  ) => boolean | NewDealApprovalAnswer
   approveDealClose?: (ctx: DealCloseApprovalContext) => boolean
   afterBar?: (ctx: BarHookContext) => void
 }
