@@ -777,12 +777,12 @@ export abstract class Strategy implements StrategyInterface {
    */
   private askHostEntry(
     fn: () => boolean | NewDealApprovalAnswer,
-  ): number | null {
+  ): { m: number; scope: 'base' | 'whole' } | null {
     let r: boolean | NewDealApprovalAnswer
     try {
       r = fn()
     } catch {
-      return 1
+      return { m: 1, scope: 'whole' }
     }
     if (r === false) {
       return null
@@ -792,9 +792,12 @@ export abstract class Strategy implements StrategyInterface {
         return null
       }
       const m = Number(r.sizeMultiplier)
-      return Number.isFinite(m) && m > 0 ? m : 1
+      return {
+        m: Number.isFinite(m) && m > 0 ? m : 1,
+        scope: r.sizeScope === 'base' ? 'base' : 'whole',
+      }
     }
-    return 1
+    return { m: 1, scope: 'whole' }
   }
 
   /**
@@ -2592,6 +2595,7 @@ export abstract class Strategy implements StrategyInterface {
     }
     const approveNewDeal = Strategy.hooks?.approveNewDeal
     let sizeMultiplier = 1
+    let sizeScope: 'base' | 'whole' = 'whole'
     if (!onlyReturn && approveNewDeal) {
       const answer = this.askHostEntry(() =>
         approveNewDeal({ symbol: s, price, time: startTime }),
@@ -2600,7 +2604,8 @@ export abstract class Strategy implements StrategyInterface {
         // 1.8.0: every engine gate passed and the host said no
         return cbIfNotOpened && cbIfNotOpened()
       }
-      sizeMultiplier = this.applicableSizeMultiplier(answer)
+      sizeMultiplier = this.applicableSizeMultiplier(answer.m)
+      sizeScope = answer.scope
     }
     if (!onlyReturn) {
       Strategy.lastOpenedDeal = startTime
@@ -2662,15 +2667,14 @@ export abstract class Strategy implements StrategyInterface {
         )
     }
     if (sizeMultiplier !== 1) {
-      // 1.9.0: the host's multiplier scales the base order and every safety
-      // order, on top of any compound / risk-reduction sizes
+      // 1.9.0: the host's multiplier scales the base order and (scope
+      // `whole`) every DCA order, on top of any compound / risk-reduction sizes
       const bo = initialOrders.find((o) => o.type === DCAOrderTypeEnum.bo)
       const dcas = initialOrders.filter((o) => o.type === DCAOrderTypeEnum.dca)
+      const dcaFactor = sizeScope === 'base' ? 0 : sizeMultiplier - 1
       const scaled: Sizes = {
         base: (sizes?.base ?? 0) + (sizeMultiplier - 1) * (bo?.qty ?? 0),
-        dca: dcas.map(
-          (o, i) => (sizes?.dca?.[i] ?? 0) + (sizeMultiplier - 1) * o.qty,
-        ),
+        dca: dcas.map((o, i) => (sizes?.dca?.[i] ?? 0) + dcaFactor * o.qty),
       }
       initialOrders = botFunctions
         .createOrders(
@@ -2799,7 +2803,7 @@ export abstract class Strategy implements StrategyInterface {
       },
       dynamicAr,
       sizes: sizes ?? undefined,
-      ...(sizeMultiplier !== 1 ? { sizeMultiplier } : {}),
+      ...(sizeMultiplier !== 1 ? { sizeMultiplier, sizeScope } : {}),
     }
 
     if (

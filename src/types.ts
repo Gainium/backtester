@@ -1322,6 +1322,8 @@ export type Deal = {
   sizes?: Sizes
   /** 1.9.0 — the size multiplier a host approval applied (absent = 1) */
   sizeMultiplier?: number
+  /** 1.10.0 — what it scaled (absent with a multiplier = whole) */
+  sizeScope?: 'base' | 'whole'
   /** 1.8.0 — values a host set on this deal; absent = the bot's settings */
   settingsOverride?: DealSettingsOverride
 }
@@ -1454,6 +1456,11 @@ export type BarHookContext = {
 export type NewDealApprovalAnswer = {
   approve: boolean
   sizeMultiplier?: number
+  /**
+   * 1.10.0 — what the multiplier scales: `whole` (default) the base order and
+   * every DCA order, `base` the base order only (DCA orders keep their size).
+   */
+  sizeScope?: 'base' | 'whole'
 }
 
 export type DCABacktestHooks = {

@@ -180,6 +180,7 @@ describe('engine hooks — deal size multiplier (1.9.0)', () => {
       expect(p.length).to.be.greaterThan(0)
       q.forEach((x, i) => expect(x).to.be.closeTo(2 * p[i], 2e-4))
       expect(sized.sizeMultiplier).to.equal(2)
+      expect(sized.sizeScope).to.equal('whole')
       expect(plain.sizeMultiplier).to.equal(undefined)
     })
   }
@@ -210,6 +211,18 @@ describe('engine hooks — deal size multiplier (1.9.0)', () => {
       sizeMultiplier: 2,
     }))
     expect(boQty(pSized)).to.equal(boQty(pPlain))
+  })
+
+  it("scope 'base': only the base order scales, DCA orders keep their size", async () => {
+    const plain = await first({})
+    const sized = await first({}, () => ({
+      approve: true,
+      sizeMultiplier: 2,
+      sizeScope: 'base',
+    }))
+    expect(boQty(sized)).to.be.closeTo(2 * boQty(plain), 2e-4)
+    expect(dcaQtys(sized)).to.deep.equal(dcaQtys(plain))
+    expect(sized.sizeScope).to.equal('base')
   })
 
   it('{approve:false} refuses like false', async () => {
