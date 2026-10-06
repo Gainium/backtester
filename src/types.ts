@@ -122,6 +122,8 @@ export enum IndicatorStartConditionEnum {
   cu = 'cu',
   gt = 'gt',
   lt = 'lt',
+  /** value-type indicators only: indicatorValue < value < indicatorValue2 */
+  bw = 'bw',
 }
 
 export enum ExchangeIntervals {
@@ -441,6 +443,8 @@ export type SettingsIndicators = {
   type: IndicatorEnum
   indicatorLength: number
   indicatorValue: string
+  /** upper bound for IndicatorStartConditionEnum.bw */
+  indicatorValue2?: string
   indicatorCondition: IndicatorStartConditionEnum
   groupId: string
   uuid: string

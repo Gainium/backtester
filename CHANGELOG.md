@@ -5,6 +5,12 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-10-06
+
+### Added
+
+- Indicator condition `bw` ("between"): a value-type indicator (RSI, CCI, MFI, Williams %R, ADX, …) matches while its value is strictly between `indicatorValue` and the new optional `indicatorValue2` (bounds in either order). Same result as two indicators with "greater than" and "lower than" in one AND group. Without a numeric `indicatorValue2` the condition never matches.
+
 ## [1.10.0] - 2026-10-05
 
 ### Added
