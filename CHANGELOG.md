@@ -5,6 +5,12 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.1] - 2026-10-07
+
+### Fixed
+
+- Futures DCA and combo backtests: the equity curve added the whole position's unrealized PnL once for every open deal, valued from the position's blended entry price instead of each deal's own fills. With several deals open the curve swung far above and below the real equity and could go negative, inflating the max equity drawdown. Each open deal is now valued from its own fills, as on spot.
+
 ## [1.11.0] - 2026-10-06
 
 ### Added

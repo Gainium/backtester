@@ -5187,94 +5187,81 @@ export abstract class Strategy implements StrategyInterface {
     const quoteUsd = quoteBalance * quoteRate
     const rate = this.profitBase ? baseRate : quoteRate
     const balanceUsd = this.math.round(baseUsd + quoteUsd)
-    const shared = this.long ? quoteUsd : baseUsd
-    if (!this.futures && !openDeal.length) {
+    const shared = this.futures
+      ? this.coinm
+        ? baseUsd
+        : quoteUsd
+      : this.long
+        ? quoteUsd
+        : baseUsd
+    if (!openDeal.length) {
       return this.replacePortfolioValue(time, balanceUsd, shared)
     }
+    // futures too: the per-symbol position's entry is a blend that drifts from
+    // the open deals' own entries as other deals close, and it must not be
+    // counted once per open deal — sum each open deal's own PnL instead
     let value = 0
-    if (!this.futures) {
-      for (const o of openDeal) {
-        const price = _price
-        const tp = this.getTP(o, price, true, false)[0]
-        const { price: tpPrice } = tp
-        const qty = tp?.qty ?? 0
-        if (qty === 0) {
-          continue
-        }
-        const filledOrders = o.filledOrders.filter(
-          (fo) =>
-            fo.type &&
-            [DCAOrderTypeEnum.dca, DCAOrderTypeEnum.bo].includes(fo.type),
-        )
-        const filledTPOrders = o.filledOrders.filter(
-          (fo) =>
-            fo.type &&
-            [DCAOrderTypeEnum.tp, DCAOrderTypeEnum.sl].includes(fo.type),
-        )
-        const quote = Strategy.combo
-          ? (this.long
-              ? o.initialBalance.quote - o.currentBalance.quote
-              : o.currentBalance.quote) +
-            (this.profitBase ? 0 : o.profit.total * (this.long ? 1 : -1))
-          : filledOrders.reduce((acc, fo) => (acc += fo.qty * fo.price), 0) -
-            filledTPOrders.reduce((acc, fo) => (acc += fo.qty * fo.price), 0)
-        const base = Strategy.combo
-          ? this.long
-            ? o.currentBalance.base
-            : o.initialBalance.base - o.currentBalance.base
-          : filledOrders.reduce((acc, fo) => (acc += fo.qty), 0) -
-            filledTPOrders.reduce((acc, fo) => (acc += fo.qty), 0)
-        const comboBase =
-          quote / tpPrice +
-          (this.profitBase ? o.profit.total * (this.long ? 1 : -1) : 0)
-        const quoteTp = qty * tpPrice
-        const commission = Strategy.combo
-          ? this.profitBase
-            ? qty * this.userFee
-            : qty * tpPrice * this.userFee
-          : o.filledOrders.reduce(
-              (acc, v) =>
-                (acc += this.profitBase
-                  ? v.qty * this.userFee
-                  : v.qty * v.price * this.userFee),
-              0,
-            )
-        const unPnl =
-          o.profit.total +
-          (Strategy.combo
-            ? (this.profitBase ? base - comboBase : quoteTp - quote) *
-              (this.long ? 1 : -1)
-            : (this.profitBase
-                ? base -
-                  qty +
-                  ((qty * tpPrice - quote) / tpPrice) * (this.long ? 1 : -1)
-                : qty * tpPrice -
-                  quote +
-                  (qty - base) * tpPrice * (this.long ? 1 : -1)) *
-              (this.long ? 1 : -1)) -
-          commission
-        value += unPnl * rate
-      }
-      if (isNaN(value)) {
-        value = 0
-      }
-      return this.replacePortfolioValue(
-        time,
-        this.math.round(value + balanceUsd),
-        shared,
-      )
-    }
     for (const o of openDeal) {
       const price = _price
-      const position = Strategy.position.get(o.symbol.pair)
-      if (position) {
-        const unPnL =
-          (position?.side === PositionSide.LONG
-            ? price * position.qty - position.entryPrice * position.qty
-            : position.entryPrice * position.qty - price * position.qty) *
-          quoteRate
-        value += unPnL
+      const tp = this.getTP(o, price, true, false)[0]
+      const { price: tpPrice } = tp
+      const qty = tp?.qty ?? 0
+      if (qty === 0) {
+        continue
       }
+      const filledOrders = o.filledOrders.filter(
+        (fo) =>
+          fo.type &&
+          [DCAOrderTypeEnum.dca, DCAOrderTypeEnum.bo].includes(fo.type),
+      )
+      const filledTPOrders = o.filledOrders.filter(
+        (fo) =>
+          fo.type &&
+          [DCAOrderTypeEnum.tp, DCAOrderTypeEnum.sl].includes(fo.type),
+      )
+      const quote = Strategy.combo
+        ? (this.long
+            ? o.initialBalance.quote - o.currentBalance.quote
+            : o.currentBalance.quote) +
+          (this.profitBase ? 0 : o.profit.total * (this.long ? 1 : -1))
+        : filledOrders.reduce((acc, fo) => (acc += fo.qty * fo.price), 0) -
+          filledTPOrders.reduce((acc, fo) => (acc += fo.qty * fo.price), 0)
+      const base = Strategy.combo
+        ? this.long
+          ? o.currentBalance.base
+          : o.initialBalance.base - o.currentBalance.base
+        : filledOrders.reduce((acc, fo) => (acc += fo.qty), 0) -
+          filledTPOrders.reduce((acc, fo) => (acc += fo.qty), 0)
+      const comboBase =
+        quote / tpPrice +
+        (this.profitBase ? o.profit.total * (this.long ? 1 : -1) : 0)
+      const quoteTp = qty * tpPrice
+      const commission = Strategy.combo
+        ? this.profitBase
+          ? qty * this.userFee
+          : qty * tpPrice * this.userFee
+        : o.filledOrders.reduce(
+            (acc, v) =>
+              (acc += this.profitBase
+                ? v.qty * this.userFee
+                : v.qty * v.price * this.userFee),
+            0,
+          )
+      const unPnl =
+        o.profit.total +
+        (Strategy.combo
+          ? (this.profitBase ? base - comboBase : quoteTp - quote) *
+            (this.long ? 1 : -1)
+          : (this.profitBase
+              ? base -
+                qty +
+                ((qty * tpPrice - quote) / tpPrice) * (this.long ? 1 : -1)
+              : qty * tpPrice -
+                quote +
+                (qty - base) * tpPrice * (this.long ? 1 : -1)) *
+            (this.long ? 1 : -1)) -
+        commission
+      value += unPnl * rate
     }
     if (isNaN(value)) {
       value = 0
@@ -5282,7 +5269,7 @@ export abstract class Strategy implements StrategyInterface {
     return this.replacePortfolioValue(
       time,
       this.math.round(value + balanceUsd),
-      this.coinm ? baseUsd : quoteUsd,
+      shared,
     )
   }
 
