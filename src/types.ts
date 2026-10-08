@@ -922,6 +922,18 @@ export interface DCABotSettings extends BaseSettings {
   useSeparateMaxDealsOverAndUnderPerSymbol?: boolean
   maxDealsOverPerSymbol?: string
   maxDealsUnderPerSymbol?: string
+  /**
+   * 1.12.0 — single position per pair (DCA only; combo and hedge ignore it).
+   * A start signal on a pair whose position is open adds an ENTRY to it
+   * (sized and filled like the base order) instead of opening a deal. Safety
+   * orders are off while it is on.
+   */
+  singlePosition?: boolean
+  /**
+   * 1.12.0 — most entries a position holds, counting the base order. Missing,
+   * `''` or `'0'` = no limit. Read only with `singlePosition`.
+   */
+  maxPositionEntries?: string
 }
 
 export enum ExitOrderCurrencyEnum {
@@ -1151,6 +1163,8 @@ export type DCAGrid = {
   levelNumber?: number
   minigridBudget?: number
   grey?: boolean
+  /** 1.12.0 — a single-position entry after the base order (type `bo`) */
+  positionEntry?: boolean
 }
 
 export type Asset = {
@@ -1330,6 +1344,15 @@ export type Deal = {
   sizeScope?: 'base' | 'whole'
   /** 1.8.0 — values a host set on this deal; absent = the bot's settings */
   settingsOverride?: DealSettingsOverride
+  /**
+   * 1.12.0 — single position: entries the position holds, counting the base
+   * order (absent on a bot without single position).
+   */
+  positionEntries?: number
+  /** 1.12.0 — fill price of the position's last entry (dynamic filter reference) */
+  lastEntryPrice?: number
+  /** 1.12.0 — bar time of the position's last entry */
+  lastEntryTime?: number
 }
 
 export type PreparedGrid = {
@@ -1344,6 +1367,8 @@ export type PreparedGrid = {
   // ties a grid order to its `mingrids[]` entry.
   type?: DCAOrderTypeEnum
   minigridId?: string
+  /** 1.12.0 — a single-position entry after the base order */
+  positionEntry?: boolean
 }
 
 export type PreparedDeal = {
@@ -1389,6 +1414,8 @@ export type PreparedDeal = {
     base: number
     quote: number
   }
+  /** 1.12.0 — single position: entries the position held, counting the base order */
+  positionEntries?: number
 }
 
 type Balance = {
@@ -1427,6 +1454,13 @@ export type NewDealApprovalContext = {
   price: number
   /** the engine time of the open (bar time) */
   time: number
+  /**
+   * 1.12.0 — set when the request adds an entry to the open position of a
+   * single-position bot instead of opening a deal (`dealId` = the position).
+   * A size multiplier in the answer is ignored for an entry.
+   */
+  positionEntry?: boolean
+  dealId?: string
 }
 
 /** A signal-based (indicator) take-profit close about to happen. */

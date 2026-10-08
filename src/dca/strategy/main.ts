@@ -46,6 +46,13 @@ import { friendlyTime } from '../../helper/timeFunctions'
 import { MathHelper } from '../../helper/math'
 import findUSDRate from '../../helper/price'
 import type { Indicator } from './ti/index'
+import {
+  entryTakenThisBar,
+  maxPositionEntriesOf,
+  positionEntriesOf,
+  positionIsFull,
+  singlePositionActive,
+} from './singlePosition'
 
 import type {
   DCABotSettings,
@@ -976,16 +983,25 @@ export abstract class Strategy implements StrategyInterface {
    * 1.9.0 — the host asks the engine to attempt an entry on `symbol` now, at
    * its last price: every engine gate (max deals, cooldowns, range …) and
    * the entry hook run as for the bot's own start condition. True = a deal
-   * opened.
+   * opened (1.12.0: or, on a single-position bot, an entry was added to the
+   * pair's open position).
    */
   public hostRequestEntry(symbol: string, time: number): boolean {
     const price = Strategy.lastPrice.get(symbol)
     if (!price || !this.symbols.get(symbol)) {
       return false
     }
+    const entries = () =>
+      Strategy.getDeals('open', symbol).reduce(
+        (acc, d) => acc + (d.positionEntries ?? 0),
+        0,
+      )
     const before = Strategy.getDeals('open').length
+    const entriesBefore = entries()
     this.openDeal(price, time, price, price, symbol)
-    return Strategy.getDeals('open').length > before
+    return (
+      Strategy.getDeals('open').length > before || entries() > entriesBefore
+    )
   }
 
   /** Closes one open deal at `price` (a market close by the host). */
@@ -1215,16 +1231,20 @@ export abstract class Strategy implements StrategyInterface {
       return true
     }
     const latestPrice = price
+    // 1.12.0 (spec 139 §3.2.4): a position measures from its LAST ENTRY's
+    // fill, never from its average, whatever the price type setting says
+    const singlePosition = this.singlePosition
     const referencePrice =
+      !singlePosition &&
       settings.dynamicPriceFilterPriceType ===
-      DynamicPriceFilterPriceTypeEnum.avg
+        DynamicPriceFilterPriceTypeEnum.avg
         ? lastData.avg
         : lastData.entry
     const calculatedOverValue =
       referencePrice + (referencePrice * overValue) / 100
     const calculatedUnderValue =
       referencePrice - (referencePrice * underValue) / 100
-    if (settings.useNoOverlapDeals) {
+    if (settings.useNoOverlapDeals && !singlePosition) {
       const openDeals = Strategy.getDeals('open', symbol)
       if (openDeals.length > 0) {
         const ranges = openDeals.map((d) => ({
@@ -1486,6 +1506,11 @@ export abstract class Strategy implements StrategyInterface {
   }
 
   private checkMaxDealsPerPair(symbol: string) {
+    if (this.singlePosition) {
+      // 1.12.0 (spec 139 §2.3.2): one deal per pair by definition — a pair
+      // that holds a position routes to an entry before this is asked
+      return true
+    }
     if (this.useMaxDealsPerSymbolOverAndUnder) {
       const deals = Strategy.getDeals('open', symbol)
       if (!deals.length) {
@@ -1851,6 +1876,21 @@ export abstract class Strategy implements StrategyInterface {
       ) &&
       this.settings.useDca
     )
+  }
+
+  /** 1.12.0 — single position per pair is in force (DCA only, not combo). */
+  get singlePosition(): boolean {
+    return singlePositionActive(this.settings, Strategy.combo)
+  }
+
+  /**
+   * 1.12.0 — how many entries the modelled budget provisions per position: the
+   * entry limit, or 1 (the base order) when there is none.
+   */
+  get positionBudgetEntries(): number {
+    return this.singlePosition
+      ? Math.max(1, maxPositionEntriesOf(this.settings.maxPositionEntries))
+      : 1
   }
 
   get tpAr() {
@@ -2556,6 +2596,24 @@ export abstract class Strategy implements StrategyInterface {
     if (!this.checkCloseAfterX()) {
       return cbIfNotOpened && cbIfNotOpened()
     }
+    if (!onlyReturn && this.singlePosition) {
+      // 1.12.0 (spec 139 §3.1): a pair that holds a position takes an entry,
+      // never a second deal — whatever start path asked
+      const position = Strategy.getDeals('open', s).sort(
+        (a, b) => a.startTime - b.startTime,
+      )[0]
+      if (position) {
+        return this.addPositionEntry(
+          position,
+          price,
+          startTime,
+          high,
+          low,
+          s,
+          cbIfNotOpened,
+        )
+      }
+    }
     if (!this.checkCooldownStart(startTime, s)) {
       return cbIfNotOpened && cbIfNotOpened()
     }
@@ -2804,6 +2862,7 @@ export abstract class Strategy implements StrategyInterface {
       dynamicAr,
       sizes: sizes ?? undefined,
       ...(sizeMultiplier !== 1 ? { sizeMultiplier, sizeScope } : {}),
+      ...(this.singlePosition ? { positionEntries: 1 } : {}),
     }
 
     if (
@@ -3011,10 +3070,16 @@ export abstract class Strategy implements StrategyInterface {
         !isNaN(+maxDealsPerPair) &&
         +maxDealsPerPair >= 0 &&
         !Strategy.multi &&
-        useMulti
+        useMulti &&
+        !this.singlePosition
       ) {
         balance *= +maxDealsPerPair
         balanceForProfit *= +maxDealsPerPair
+      }
+      if (this.positionBudgetEntries > 1) {
+        // 1.12.0 (spec 139 §2.2): a position is funded for its entry limit
+        balance *= this.positionBudgetEntries
+        balanceForProfit *= this.positionBudgetEntries
       }
 
       Strategy.balance.set(key, balance)
@@ -3031,6 +3096,175 @@ export abstract class Strategy implements StrategyInterface {
         Strategy.startRate = deal.startPrice
       }
     }
+  }
+
+  /**
+   * 1.12.0 — spec 139 §3.2–§3.4: a start signal on a pair whose position is
+   * open adds one ENTRY to it. The entry passes the engine's gates in the
+   * engine's order (one per bar, entry limit, price filters, cooldowns, the
+   * host's approval), is sized like the base order and fills like one — a
+   * market fill at the price this start path fills base orders at, with the
+   * same slippage and fee. The fill then grows the position exactly as a
+   * safety-order fill grows a deal: balances, usage, average, the take-profit
+   * rebuilt for the whole position (multi-TP re-split), the stop line moved,
+   * and a trailing take-profit's best price reset.
+   */
+  private addPositionEntry(
+    position: Deal,
+    price: number,
+    time: number,
+    high: number,
+    low: number,
+    s: string,
+    cbIfNotOpened?: () => void,
+  ) {
+    const refuse = () => cbIfNotOpened && cbIfNotOpened()
+    // §3.5 in bar time: one entry per bar per pair, none on the opening bar
+    if (entryTakenThisBar(position, time)) {
+      return refuse()
+    }
+    // §3.2.1: `maxNumberOfOpenDeals` is not consulted — the pair holds its
+    // slot. §3.2.2: the entry limit instead
+    if (positionIsFull(position, this.settings.maxPositionEntries)) {
+      return refuse()
+    }
+    // §3.2.3 / §3.2.4: static filter unchanged; the dynamic one measures from
+    // the last entry's fill (see `checkInDynamicRange`)
+    if (!this.checkInRange(s, price, time)) {
+      return refuse()
+    }
+    // §3.2.5: cooldown after deal start counts from the last entry (an entry
+    // writes `lastOpenedDeal*`); cooldown after deal stop is unchanged
+    if (!this.checkCooldownStart(time, s) || !this.checkCooldownStop(time, s)) {
+      return refuse()
+    }
+    const symbol = this.symbols.get(s)
+    const botFunctions = this.botFunctions.get(s)
+    if (!symbol || !botFunctions) {
+      return refuse()
+    }
+    // §3.2.7: the host sees an entry, not a new deal. A size multiplier in the
+    // answer is not applied to entries (§11.4)
+    const approveNewDeal = Strategy.hooks?.approveNewDeal
+    if (
+      approveNewDeal &&
+      this.askHostEntry(() =>
+        approveNewDeal({
+          symbol: s,
+          price,
+          time,
+          positionEntry: true,
+          dealId: position.id,
+        }),
+      ) === null
+    ) {
+      return refuse()
+    }
+    // §3.3: sized and filled like the bot's base order (no compound /
+    // risk-reduction sizes, §11.4)
+    let orderPrice = this.slippage
+      ? price * (1 + ((this.long ? 1 : -1) * this.slippage) / 100)
+      : price
+    orderPrice = this.math.round(
+      orderPrice > high ? high : orderPrice < low ? low : orderPrice,
+      symbol.priceAssetPrecision,
+    )
+    const entry = botFunctions
+      .createOrders(
+        this.usdRateQuote.get(s) ?? 0,
+        orderPrice,
+        true,
+        undefined,
+        undefined,
+        this.getBalances(s),
+        true,
+        [],
+        true,
+        0,
+        0,
+        0,
+        position.dynamicAr ?? [],
+      )
+      .find((o) => o.type === DCAOrderTypeEnum.bo)
+    if (!entry || !(entry.qty > 0)) {
+      return refuse()
+    }
+    let d = cloneDealForProcessing(position)
+    const order: FullGrid & { dealId: string } = {
+      ...entry,
+      id: botFunctions.utils.id(20),
+      startTime: time,
+      filledTime: time,
+      dealId: d.id,
+      positionEntry: true,
+    }
+    Strategy.lastOpenedDeal = time
+    Strategy.lastOpenedDealPerSymbol.set(s, time)
+    this.updatePositionWithOrder(order, s)
+    // the engine's `roa` branch: the entry adds to what the deal set aside
+    // (initial balances) and the fill moves it into the position
+    const cost = order.qty * order.price
+    if (this.long) {
+      d.initialBalance.quote += cost
+    } else {
+      d.initialBalance.base += order.qty
+    }
+    // §6.2: the position's capital grows with every entry
+    d.usage.max = {
+      base:
+        d.usage.max.base +
+        (this.futures
+          ? this.coinm
+            ? order.qty
+            : 0
+          : this.long
+            ? 0
+            : order.qty),
+      quote:
+        d.usage.max.quote +
+        (this.futures ? (this.coinm ? 0 : cost) : this.long ? cost : 0),
+    }
+    d.filledOrders = [...d.filledOrders, order]
+    d.lastPrice = order.price
+    d.lastTime = time
+    // §3.4.1 / §3.4.2
+    d.positionEntries = positionEntriesOf(d) + 1
+    d.lastEntryPrice = order.price
+    d.lastEntryTime = time
+    const complete = d.levels.complete + 1
+    d.levels = {
+      all: Math.max(d.levels.all, complete),
+      complete,
+      max: Math.max(d.levels.max, complete),
+    }
+    // §3.4.3: the target moved — a trail re-bases from the next price, as the
+    // engine does on a safety-order or entry fill
+    d.bestPrice = 0
+    d = this.updateDeal(d, {
+      open: price,
+      high,
+      low,
+      close: price,
+      time,
+      symbol: s,
+    })
+    // §3.4.4: the take profit for the whole position, as after a safety order
+    if (
+      this.settings.useTp &&
+      (this.settings.dealCloseCondition === CloseConditionEnum.tp ||
+        this.tpAr) &&
+      !Strategy.combo
+    ) {
+      const tpOrdersCurrent = this.getTP(d)
+      d.activeOrders = [
+        ...d.activeOrders.filter(this.filterTpOrders()),
+        ...tpOrdersCurrent,
+      ]
+    }
+    d = this.syncOrdersAfterFill(d, time)
+    this.setDeal(d, 'open', s)
+    this.setLastDealPerSymbol(s)
+    this.updateBotMaxUsage()
   }
 
   private getUsdRate(symbol: string, price: number, type?: 'base' | 'quote') {
@@ -3767,7 +4001,8 @@ export abstract class Strategy implements StrategyInterface {
     if (deal) {
       Strategy.lastPricesPerSymbol.set(symbol, {
         avg: deal.avgPrice,
-        entry: deal.startPrice,
+        // 1.12.0: a position's reference is its last entry's fill
+        entry: deal.lastEntryPrice ?? deal.startPrice,
       })
     } else {
       Strategy.lastPricesPerSymbol.delete(symbol)
@@ -4134,49 +4369,58 @@ export abstract class Strategy implements StrategyInterface {
       d.levels.complete = Strategy.combo
         ? Math.max(d.lastFilled, 0)
         : d.levels.complete + filledDCA.length
-      const filledOrderIds = new Set(d.filledOrders.map((fo) => fo.id))
-      d.activeOrders = d.activeOrders.filter((o) => !filledOrderIds.has(o.id))
-      d.ordersHistory = d.ordersHistory.map((o) => {
+      d = this.syncOrdersAfterFill(d, b.time)
+    }
+    return d
+  }
+
+  /**
+   * After a fill that grew the deal (a safety order, or a single-position
+   * entry): drop filled orders from the active ones, close the history rows
+   * of orders that were replaced, add the new ones and move the stop line.
+   */
+  private syncOrdersAfterFill(d: Deal, time: number) {
+    const filledOrderIds = new Set(d.filledOrders.map((fo) => fo.id))
+    d.activeOrders = d.activeOrders.filter((o) => !filledOrderIds.has(o.id))
+    d.ordersHistory = d.ordersHistory.map((o) => {
+      if (
+        (o.type === DCAOrderTypeEnum.dca ||
+          o.type === DCAOrderTypeEnum.bo ||
+          o.type === DCAOrderTypeEnum.tp) &&
+        !o.filledTime
+      ) {
         if (
-          (o.type === DCAOrderTypeEnum.dca ||
-            o.type === DCAOrderTypeEnum.bo ||
-            o.type === DCAOrderTypeEnum.tp) &&
-          !o.filledTime
-        ) {
-          if (
-            !d.activeOrders.find(
-              (g) =>
-                g.price === o.price && g.side === o.side && g.qty === o.qty,
-            )
-          ) {
-            o.filledTime = b.time
-          }
-        }
-        return o
-      })
-      d.ordersHistory = [
-        ...d.ordersHistory,
-        ...d.activeOrders
-          .filter(
-            (g) =>
-              !d.ordersHistory.find(
-                (oh) =>
-                  (oh.type === DCAOrderTypeEnum.dca ||
-                    oh.type === DCAOrderTypeEnum.bo ||
-                    oh.type === DCAOrderTypeEnum.tp ||
-                    oh.type === DCAOrderTypeEnum.grid) &&
-                  !oh.filledTime &&
-                  g.price === oh.price &&
-                  g.side === oh.side &&
-                  g.qty === oh.qty,
-              ),
+          !d.activeOrders.find(
+            (g) => g.price === o.price && g.side === o.side && g.qty === o.qty,
           )
-          .map((o) => ({ ...o, startTime: b.time })),
-      ].map((o) => ({ ...o, dealId: d.id }))
-      if (!Strategy.combo) {
-        const slLine = this.getSlHistoryLine(d, b.time)
-        d = this.replaceSlHistoryLine(d, slLine, b.time)
+        ) {
+          o.filledTime = time
+        }
       }
+      return o
+    })
+    d.ordersHistory = [
+      ...d.ordersHistory,
+      ...d.activeOrders
+        .filter(
+          (g) =>
+            !d.ordersHistory.find(
+              (oh) =>
+                (oh.type === DCAOrderTypeEnum.dca ||
+                  oh.type === DCAOrderTypeEnum.bo ||
+                  oh.type === DCAOrderTypeEnum.tp ||
+                  oh.type === DCAOrderTypeEnum.grid) &&
+                !oh.filledTime &&
+                g.price === oh.price &&
+                g.side === oh.side &&
+                g.qty === oh.qty,
+            ),
+        )
+        .map((o) => ({ ...o, startTime: time })),
+    ].map((o) => ({ ...o, dealId: d.id }))
+    if (!Strategy.combo) {
+      const slLine = this.getSlHistoryLine(d, time)
+      d = this.replaceSlHistoryLine(d, slLine, time)
     }
     return d
   }
@@ -5506,6 +5750,11 @@ export abstract class Strategy implements StrategyInterface {
       }
     }
     this.checkPosition(b)
+    this.updateBotMaxUsage()
+  }
+
+  /** The bot's peak usage over its open deals (after every bar, and an entry). */
+  private updateBotMaxUsage() {
     const openDeals = Strategy.getDeals('open')
     if ((this.long || this.futures) && !this.coinm) {
       const all = openDeals.reduce(
@@ -6326,6 +6575,7 @@ export abstract class Strategy implements StrategyInterface {
         dealId: o.dealId,
         type: o.type,
         minigridId: o.minigridId,
+        ...(o.positionEntry ? { positionEntry: true } : {}),
       })),
       ordersHistory: [...d.ordersHistory, ...d.finishedOrdersHistory].map(
         (o) => ({
@@ -6356,6 +6606,7 @@ export abstract class Strategy implements StrategyInterface {
       volume: d.volume,
       equity: d.equity,
       equityInAsset: d.equityInAsset,
+      ...(d.positionEntries ? { positionEntries: d.positionEntries } : {}),
     }))
   }
 
@@ -6442,11 +6693,14 @@ export abstract class Strategy implements StrategyInterface {
       !isNaN(+maxDealsPerPair) &&
       +maxDealsPerPair >= 0 &&
       !Strategy.multi &&
-      useMulti
+      useMulti &&
+      !this.singlePosition
     ) {
       maxNumberOfOpenDeals = +maxDealsPerPair
     }
     maxTheoreticalUsage *= +maxNumberOfOpenDeals
+    // 1.12.0: a position may hold up to its entry limit
+    maxTheoreticalUsage *= this.positionBudgetEntries
     maxTheoreticalUsage /= this.leverage
     const precision = this.precision.values().next().value ?? 8
     const precisionQuote = this.precisionQuote.values().next().value ?? 8

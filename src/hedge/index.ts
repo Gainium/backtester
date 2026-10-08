@@ -9,6 +9,7 @@ import {
   HedgeBacktestingInput,
   HedgeBacktestingResult,
   DCABacktestingResult,
+  DCABacktestingInput,
   timeIntervalMap,
   StrategyEnum,
 } from '../types'
@@ -21,6 +22,17 @@ type UniqueIntervalResponse = {
   from: number
   to: number
 }
+
+/**
+ * 1.12.0 — single position per pair is not offered on hedge bots (main-app
+ * spec 139 §2.4); a leg runs as if it were off, as in the bot engine.
+ */
+const withoutSinglePosition = (
+  input: DCABacktestingInput,
+): DCABacktestingInput =>
+  input.settings?.singlePosition
+    ? { ...input, settings: { ...input.settings, singlePosition: false } }
+    : input
 
 class HedgeBacktesting extends Backtesting {
   private longBacktester: DCABacktesting
@@ -44,11 +56,15 @@ class HedgeBacktesting extends Backtesting {
 
     this.sharedSettings = sharedSettings
     this.setLongContext()
-    this.longBacktester = new DCABacktesting(longSettings)
+    this.longBacktester = new DCABacktesting(
+      withoutSinglePosition(longSettings),
+    )
 
     // Create short strategy backtest instance
     this.setShortContext()
-    this.shortBacktester = new DCABacktesting(shortSettings)
+    this.shortBacktester = new DCABacktesting(
+      withoutSinglePosition(shortSettings),
+    )
   }
 
   override set stop(value: boolean) {

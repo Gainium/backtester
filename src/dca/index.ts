@@ -18,6 +18,8 @@ import getStrategyBySettings, { StrategyInterface } from './strategy'
 
 import { withIndicatorIds } from '../helper/utils'
 
+import { withSinglePositionSettings } from './strategy/singlePosition'
+
 import CombinedStrategy from './strategy/combined'
 
 import {
@@ -59,7 +61,12 @@ class DCABacktesting extends Backtesting {
     hooks,
     ...rest
   }: DCABacktestingInput) {
-    const settings = withIndicatorIds(inputSettings)
+    // 1.12.0 — a single-position bot runs without safety orders (spec 139
+    // §2.3.1); every other bot gets its settings object back untouched
+    const settings = withSinglePositionSettings(
+      withIndicatorIds(inputSettings),
+      !!combo,
+    )
     const candleInterval = interval ?? ExchangeIntervals.fiveM
     super(
       {

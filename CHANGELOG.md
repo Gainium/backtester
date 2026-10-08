@@ -5,6 +5,18 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - 2026-10-08
+
+### Added
+
+- **Single position per pair (DCA).** New settings `singlePosition` and `maxPositionEntries` (a string; `''` / `'0'` = no limit, counting the base order). While `singlePosition` is on, a bot holds at most one open deal per pair: a start signal on a pair whose position is open — ASAP, indicators, timer, multi-pair, or `hostRequestEntry` — adds an **entry** to it instead of opening a deal. An entry is sized and filled like the base order (same size, market fill at the price that start condition fills base orders at, same slippage and fee) and grows the position like a safety-order fill: average, balances and usage are recalculated, the take profit is rebuilt for the whole position (multi-TP re-split, same fee adjustment) and a trailing take profit's best price is reset.
+  - Entry gates: one entry per bar per pair (none on the bar the position opened), `maxPositionEntries`, the static price filter (unchanged), the dynamic price filter measured from the **last entry's** fill price, cooldown after deal start counted from the last entry, cooldown after deal stop, and the host's `approveNewDeal` (the context carries `positionEntry: true` and `dealId`; a size multiplier is not applied to entries).
+  - `maxNumberOfOpenDeals` counts positions (pairs); `maxDealsPerPair` is ignored. Safety orders are off (`useDca` is treated as false).
+  - On ASAP the entry is evaluated at the bar's close **after** the bar was checked against the open position, so a take profit rebuilt from a close-price fill is never tested against that bar's earlier high or low.
+  - A position is one deal in every per-deal statistic. Its peak usage grows with its entries; the modelled bot budget provisions `maxPositionEntries` entries per position.
+  - Deals carry `positionEntries`, entry orders carry `positionEntry: true`. Combo and hedge bots ignore the setting.
+  - Bots without the setting produce byte-identical results (golden fingerprints from 1.11.1).
+
 ## [1.11.1] - 2026-10-07
 
 ### Fixed

@@ -55,7 +55,7 @@ class ASAPStrategy extends Strategy implements StrategyInterface {
         trade.symbol,
       )
     } else {
-      this.checkDeals(
+      const checked = this.checkDeals(
         false,
         {
           open: +trade.price,
@@ -74,6 +74,61 @@ class ASAPStrategy extends Strategy implements StrategyInterface {
             trade.symbol,
           ),
       )
+      if (this.singlePosition) {
+        // 1.12.0: the open position takes an entry at this trade, after the
+        // position was checked against it
+        void checked.then(() => {
+          if (Strategy.getDealsCount('open', trade.symbol) > 0) {
+            this.openDeal(
+              +trade.price,
+              trade.timestamp,
+              +trade.price,
+              +trade.price,
+              trade.symbol,
+            )
+          }
+        })
+      }
+    }
+  }
+
+  /**
+   * 1.12.0 — ASAP with single position per pair (spec 139). A pair without a
+   * position opens one at the bar's close, as before. A pair that holds one
+   * takes an entry at the close — AFTER the bar was checked against the
+   * position, so a take profit rebuilt from a close-price fill is never
+   * tested against the same bar's earlier high or low. A position that closes
+   * on the bar re-opens through the close callback, as any ASAP deal does,
+   * and takes no entry on that bar (one entry per bar).
+   */
+  private async processBarSinglePosition(
+    checkPortfolio: boolean,
+    bar: FullBar,
+  ): Promise<void> {
+    const dealsPerSymbols = Strategy.getDealsCount(undefined, bar.symbol)
+    const dealsPerSymbolsOpen = Strategy.getDealsCount('open', bar.symbol)
+    let newShift = false
+    if (dealsPerSymbols === 0) {
+      if ((Strategy.start && bar.time >= Strategy.start) || !Strategy.start) {
+        newShift = Strategy.workingShift.length === 0
+        if (newShift) {
+          this.startWorkingShift(bar.time)
+        }
+        this.openDeal(bar.close, bar.time, bar.high, bar.low, bar.symbol)
+      }
+    } else if (dealsPerSymbolsOpen === 0) {
+      this.openDeal(bar.close, bar.time, bar.high, bar.low, bar.symbol)
+    }
+    if (dealsPerSymbolsOpen || newShift) {
+      await this.checkDeals(checkPortfolio, bar, (price: number) => {
+        this.openDeal(price, bar.time, bar.high, bar.low, bar.symbol)
+      })
+    }
+    if (dealsPerSymbolsOpen && Strategy.getDealsCount('open', bar.symbol) > 0) {
+      this.openDeal(bar.close, bar.time, bar.high, bar.low, bar.symbol)
+    }
+    if (newShift) {
+      this.checkPortfolio(bar.time, bar.close, bar.symbol)
     }
   }
 
@@ -82,6 +137,9 @@ class ASAPStrategy extends Strategy implements StrategyInterface {
     bar: FullBar,
   ): Promise<void> {
     Strategy.lastPrice.set(bar.symbol, bar.close)
+    if (this.singlePosition) {
+      return this.processBarSinglePosition(checkPortfolio, bar)
+    }
     const multi = this.settings.useMulti && Strategy.multi
     const useDynamic = !!(
       this.settings.useDynamicPriceFilter &&
