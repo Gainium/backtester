@@ -1273,7 +1273,13 @@ export class Strategy implements StrategyInterface {
               ? lastPrice - current.entryPrice
               : current.entryPrice - lastPrice
           const perc = current.entryPrice !== 0 ? diff / current.entryPrice : 0
-          const val = current.qty * perc * lastPrice
+          // A linear position of `qty` base entered at `entryPrice` is worth
+          // `qty * (lastPrice - entryPrice)` — what `closeBot` books when it
+          // closes there. Scaling by `lastPrice / entryPrice` understated a
+          // long's loss (the stop fired late) and overstated a short's.
+          const val = this.coinm
+            ? current.qty * perc * lastPrice
+            : current.qty * diff
           const valueChange = val + this.totalProfit
           const totalPerc = (valueChange / (initialValue / this.leverage)) * 100
           if (
@@ -1349,10 +1355,17 @@ export class Strategy implements StrategyInterface {
               (current.side === PositionSide.LONG ? 1 : -1)) /
             current.entryPrice
           : 0
-        const profit = hasPosition
+        // The close is a market order: it pays the taker fee like any grid
+        // fill — on the close's notional, in the profit asset.
+        const exitFee = hasPosition
           ? this.coinm
-            ? current.qty * diff
-            : current.qty * current.entryPrice * diff
+            ? current.qty * (this.userFee ?? 0)
+            : current.qty * price * (this.userFee ?? 0)
+          : 0
+        const profit = hasPosition
+          ? (this.coinm
+              ? current.qty * diff
+              : current.qty * current.entryPrice * diff) - exitFee
           : 0
         const profitUsd = profit * (this.coinm ? price : 1) * this.usdRateQuote
         // The force close is a real order — file it in the ledger with the P&L
