@@ -132,7 +132,9 @@ class TimerStrategy extends Strategy implements StrategyInterface {
     if (bar.time === next) {
       const date = new Date(next)
       if (this.settings.hodlHourly) {
-        date.setHours(date.getHours() + +this.settings.hodlDay)
+        // elapsed hours, like the live bot: setHours steps the local clock
+        // label and skips the repeated hour at the autumn DST change
+        date.setTime(next + +this.settings.hodlDay * 3600000)
       } else {
         date.setDate(date.getDate() + +this.settings.hodlDay)
       }
