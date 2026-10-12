@@ -42,12 +42,19 @@ import {
   DonchianChannels,
   OBFVG,
   LongWick,
+  SmoothedIndicator,
+  getSmoothingWarmup,
+  isSmoothableIndicator,
+  resolveSmoothing,
+  unwrapSmoothed,
 } from '@gainium/indicators'
 import { MAEnum, IndicatorEnum, RangeType } from '../../../types'
 
 import type {
   IndicatorHistory,
   IndicatorConfigBackTesting,
+  Percentile,
+  Smoothing,
 } from '../../../types'
 
 export default class InternalIndicator {
@@ -94,6 +101,7 @@ export default class InternalIndicator {
     | DonchianChannels
     | OBFVG
     | LongWick
+    | SmoothedIndicator
   private data: IndicatorHistory[] = []
 
   private readonly type: IndicatorEnum
@@ -103,6 +111,21 @@ export default class InternalIndicator {
   public length = 0
 
   constructor(indicatorConfig: IndicatorConfigBackTesting) {
+    // Oscillator smoothing: build the oscillator without percentile, then
+    // wrap it; the wrapper smooths its main line and ranks the smoothed line.
+    const smoothingConfig = isSmoothableIndicator(indicatorConfig.type)
+      ? resolveSmoothing(
+          (indicatorConfig as Smoothing).smoothing,
+          (indicatorConfig as Smoothing).smoothingLength,
+        )
+      : null
+    const pct = indicatorConfig as Percentile
+    if (smoothingConfig) {
+      indicatorConfig = {
+        ...indicatorConfig,
+        percentile: false,
+      } as IndicatorConfigBackTesting
+    }
     this.indicatorName =
       indicatorConfig.type === IndicatorEnum.ma
         ? (indicatorConfig.maType ?? indicatorConfig.type)
@@ -562,6 +585,18 @@ export default class InternalIndicator {
       )
       this.length = 201
     }
+    if (smoothingConfig && this.indicator) {
+      this.indicator = new SmoothedIndicator(
+        this.indicator as ConstructorParameters<typeof SmoothedIndicator>[0],
+        smoothingConfig,
+        pct.percentile,
+        pct.percentileLookback,
+        pct.percentilePercentage,
+      )
+      this.length +=
+        getSmoothingWarmup(smoothingConfig.type, smoothingConfig.length) +
+        (pct.percentile ? (pct.percentileLookback ?? 0) : 0)
+    }
     this.type = indicatorConfig.type
     this.length = this.length * 2
   }
@@ -577,41 +612,46 @@ export default class InternalIndicator {
     time: number,
     cb: (data: IndicatorHistory[]) => void,
   ) {
-    if (this.indicator && this.indicator instanceof VO) {
-      this.indicator.next(+value.v)
+    // a smoothed oscillator takes the input of the oscillator it wraps
+    const kind = unwrapSmoothed(this.indicator)
+    const target = this.indicator as unknown as {
+      next(input: unknown): unknown
+    }
+    if (this.indicator && kind instanceof VO) {
+      target.next(+value.v)
     }
     if (
       this.indicator &&
-      (this.indicator instanceof RSI ||
-        this.indicator instanceof MACD ||
-        this.indicator instanceof EMA ||
-        this.indicator instanceof DEMA ||
-        this.indicator instanceof TEMA ||
-        this.indicator instanceof RMA ||
-        this.indicator instanceof SMA ||
-        this.indicator instanceof WMA ||
-        this.indicator instanceof HMA)
+      (kind instanceof RSI ||
+        kind instanceof MACD ||
+        kind instanceof EMA ||
+        kind instanceof DEMA ||
+        kind instanceof TEMA ||
+        kind instanceof RMA ||
+        kind instanceof SMA ||
+        kind instanceof WMA ||
+        kind instanceof HMA)
     ) {
-      this.indicator?.next(+value.c)
+      target.next(+value.c)
     }
     if (
       this.indicator &&
-      (this.indicator instanceof ADX ||
-        this.indicator instanceof StochasticOscillator ||
-        this.indicator instanceof StochasticRSI ||
-        this.indicator instanceof WilliamsR ||
-        this.indicator instanceof UltimateOscillator ||
-        this.indicator instanceof SupportResistance ||
-        this.indicator instanceof QFL ||
-        this.indicator instanceof CCI ||
-        this.indicator instanceof PSAR ||
-        this.indicator instanceof SuperTrend ||
-        this.indicator instanceof ATR ||
-        this.indicator instanceof ADR ||
-        this.indicator instanceof PriorPivot ||
-        this.indicator instanceof ATH)
+      (kind instanceof ADX ||
+        kind instanceof StochasticOscillator ||
+        kind instanceof StochasticRSI ||
+        kind instanceof WilliamsR ||
+        kind instanceof UltimateOscillator ||
+        kind instanceof SupportResistance ||
+        kind instanceof QFL ||
+        kind instanceof CCI ||
+        kind instanceof PSAR ||
+        kind instanceof SuperTrend ||
+        kind instanceof ATR ||
+        kind instanceof ADR ||
+        kind instanceof PriorPivot ||
+        kind instanceof ATH)
     ) {
-      this.indicator?.next({
+      target.next({
         high: +value.h,
         low: +value.l,
         close: +value.c,
@@ -619,20 +659,20 @@ export default class InternalIndicator {
     }
     if (
       this.indicator &&
-      (this.indicator instanceof VWMA ||
-        this.indicator instanceof MFI ||
-        this.indicator instanceof TVTA ||
-        this.indicator instanceof MAR ||
-        this.indicator instanceof BollingerBandsWidth ||
-        this.indicator instanceof KeltnerChannel ||
-        this.indicator instanceof KeltnerChannelPB ||
-        this.indicator instanceof BBWP ||
-        this.indicator instanceof BBPB ||
-        this.indicator instanceof BollingerBands ||
-        this.indicator instanceof DIV ||
-        this.indicator instanceof PC)
+      (kind instanceof VWMA ||
+        kind instanceof MFI ||
+        kind instanceof TVTA ||
+        kind instanceof MAR ||
+        kind instanceof BollingerBandsWidth ||
+        kind instanceof KeltnerChannel ||
+        kind instanceof KeltnerChannelPB ||
+        kind instanceof BBWP ||
+        kind instanceof BBPB ||
+        kind instanceof BollingerBands ||
+        kind instanceof DIV ||
+        kind instanceof PC)
     ) {
-      this.indicator?.next({
+      target.next({
         high: +value.h,
         low: +value.l,
         close: +value.c,
@@ -642,21 +682,21 @@ export default class InternalIndicator {
     }
     if (
       this.indicator &&
-      (this.indicator instanceof MOM ||
-        this.indicator instanceof ECD ||
-        this.indicator instanceof DonchianChannels ||
-        this.indicator instanceof OBFVG ||
-        this.indicator instanceof LongWick)
+      (kind instanceof MOM ||
+        kind instanceof ECD ||
+        kind instanceof DonchianChannels ||
+        kind instanceof OBFVG ||
+        kind instanceof LongWick)
     ) {
-      this.indicator?.next({
+      target.next({
         high: +value.h,
         low: +value.l,
         close: +value.c,
         open: +value.o,
       })
     }
-    if (this.indicator && this.indicator instanceof AO) {
-      this.indicator?.next({
+    if (this.indicator && kind instanceof AO) {
+      target.next({
         high: +value.h,
         low: +value.l,
       })

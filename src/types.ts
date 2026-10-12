@@ -126,6 +126,27 @@ export enum IndicatorStartConditionEnum {
   bw = 'bw',
 }
 
+/**
+ * What a smoothed oscillator condition compares (only when `smoothing` is on):
+ * - `value` (default): the condition reads the smoothed line instead of the
+ *   raw one, against indicatorValue / percentile as usual.
+ * - `line`: the raw line against the smoothed line (gt / lt / cu / cd); the
+ *   value fields are ignored and `bw` never fires. Percentile overrides it.
+ */
+export enum SmoothingCompareEnum {
+  value = 'value',
+  line = 'line',
+}
+
+/**
+ * Oscillator smoothing on an indicator config. Only the single-line
+ * oscillators (SMOOTHABLE_INDICATORS in @gainium/indicators) use it.
+ */
+export type Smoothing = {
+  smoothing?: string | null
+  smoothingLength?: number | null
+}
+
 export enum ExchangeIntervals {
   oneM = '1m',
   threeM = '3m',
@@ -190,7 +211,7 @@ export type MAResult = {
   price: number
 }
 
-type Percentile = {
+export type Percentile = {
   percentile?: boolean
   percentileLookback?: number
   percentilePercentage?: number
@@ -266,7 +287,8 @@ export type IndicatorConfigBackTesting =
     }
   | ({
       type: IndicatorEnum.ao
-    } & Percentile)
+    } & Percentile &
+      Smoothing)
   | ({
       type: IndicatorEnum.kc | IndicatorEnum.kcpb
       interval: number
@@ -274,12 +296,14 @@ export type IndicatorConfigBackTesting =
       ma?: MAEnum
       range?: RangeType
       rangeLength?: number
-    } & Percentile)
+    } & Percentile &
+      Smoothing)
   | ({
       type: IndicatorEnum.mom
       interval: number
       source: string
-    } & Percentile)
+    } & Percentile &
+      Smoothing)
   | {
       type: IndicatorEnum.bbwp
       interval: number
@@ -296,14 +320,16 @@ export type IndicatorConfigBackTesting =
         | IndicatorEnum.atr
         | IndicatorEnum.adr
       interval: number
-    } & Percentile)
+    } & Percentile &
+      Smoothing)
   | ({
       type: IndicatorEnum.bbw | IndicatorEnum.bb | IndicatorEnum.bbpb
       interval: number
       bbwMult?: number
       bbwMa?: MAEnum
       bbwMaLength?: number
-    } & Percentile)
+    } & Percentile &
+      Smoothing)
   | ({
       type: IndicatorEnum.macd
       longInterval: number
@@ -352,7 +378,8 @@ export type IndicatorConfigBackTesting =
       type: IndicatorEnum.vo
       voLong: number
       voShort: number
-    } & Percentile)
+    } & Percentile &
+      Smoothing)
   | ({
       type: IndicatorEnum.mar
       mar1type: MAEnum
@@ -360,13 +387,15 @@ export type IndicatorConfigBackTesting =
       mar2type: MAEnum
       mar2length: number
     } & Percentile &
-      TrendFilter)
+      TrendFilter &
+      Smoothing)
   | ({
       type: IndicatorEnum.uo
       fast: number
       middle: number
       slow: number
-    } & Percentile)
+    } & Percentile &
+      Smoothing)
   | { type: IndicatorEnum.lw; lwThreshold: number; lwMaxDuration: number }
 
 type PercentileResult = {
@@ -531,6 +560,18 @@ export type SettingsIndicators = {
   factor?: number
   atrLength?: number
   stCondition?: STConditionEnum
+  /**
+   * RSI, CCI, MFI, WR, UO, MOM, AO, ADX, BBPB, KCPB, BBW, VO, MAR only.
+   * Moving average over the indicator's main line: 'sma' | 'ema' | 'wma' |
+   * 'dema' | 'tema' | 'hma' | 'rma' (case-insensitive). Missing, null,
+   * 'none' or anything else = off (unchanged behaviour). Ignored on other
+   * indicator types.
+   */
+  smoothing?: string | null
+  /** Smoothing length (1..1000); missing, null, 0 or out of range = off. */
+  smoothingLength?: number | null
+  /** Missing / null = 'value'. See SmoothingCompareEnum. */
+  smoothingCompare?: SmoothingCompareEnum | null
   pcUp?: string
   pcDown?: string
   pcCondition?: PCConditionEnum

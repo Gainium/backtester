@@ -1,5 +1,6 @@
 import { Strategy, StrategyInterface } from '../main'
 import InternalIndicator from './indicatorLoader'
+import { getSmoothingMode, lineOperands, withSmoothing } from './smoothing'
 import {
   IndicatorEnum,
   TradingviewAnalysisConditionEnum,
@@ -57,6 +58,7 @@ import {
   QFLResult,
   SuperTrendResult,
   LongWickResult,
+  SmoothedResult,
   isInSession,
 } from '@gainium/indicators'
 
@@ -231,7 +233,9 @@ class TIStrategy extends Strategy implements StrategyInterface {
         ) {
           continue
         }
-        const ind = new InternalIndicator(
+        // smoothing fields are added only for a smoothable oscillator with
+        // smoothing on; every other config is exactly as before
+        const indicatorConfig: IndicatorConfigBackTesting =
           type === IndicatorEnum.lw
             ? {
                 type: IndicatorEnum.lw,
@@ -527,8 +531,8 @@ class TIStrategy extends Strategy implements StrategyInterface {
                                                                             percentile,
                                                                             percentileLookback,
                                                                             percentilePercentage,
-                                                                          } as IndicatorConfigBackTesting),
-        )
+                                                                          } as IndicatorConfigBackTesting)
+        const ind = new InternalIndicator(withSmoothing(i, indicatorConfig))
         Strategy.indicators.push({
           instance: ind,
           data: [],
@@ -1067,6 +1071,10 @@ class TIStrategy extends Strategy implements StrategyInterface {
           },
           data,
         } = i
+        // oscillator smoothing: 'off' (raw line), 'value' (conditions read the
+        // smoothed line, which the indicator emits as `value`) or 'line'
+        // (raw line vs smoothed line)
+        const smoothingMode = getSmoothingMode(i.settings)
         if (
           indicatorAction === IndicatorAction.riskReward &&
           Strategy.indicators.length > this.settings.pair.length
@@ -1346,7 +1354,9 @@ class TIStrategy extends Strategy implements StrategyInterface {
             action = true
           }
         } else if (
-          (indicatorValue !== undefined || type === IndicatorEnum.ma) &&
+          (indicatorValue !== undefined ||
+            type === IndicatorEnum.ma ||
+            smoothingMode === 'line') &&
           indicatorCondition
         ) {
           let value = indicatorValue !== undefined ? +indicatorValue : 0
@@ -1385,6 +1395,23 @@ class TIStrategy extends Strategy implements StrategyInterface {
           ) {
             last = lastData.value.value
             prev = prevData.value.value
+            if (smoothingMode === 'line') {
+              // raw line (last/prev) tested against the smoothed line
+              // (value/prevValue) with the usual gt/lt/cu/cd below
+              const operands = lineOperands(
+                lastData.value as SmoothedResult,
+                prevData.value as SmoothedResult,
+              )
+              if (
+                !operands ||
+                indicatorCondition === IndicatorStartConditionEnum.bw
+              ) {
+                skipAction = true
+                action = false
+              } else {
+                ;({ last, prev, value, prevValue } = operands)
+              }
+            }
             if (percentile) {
               const tmpValue = lastData.value.percentile
               const tmpPrevValue = prevData.value.percentile

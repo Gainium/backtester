@@ -5,6 +5,42 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0] - 2026-10-12
+
+### Added
+
+- **Oscillator smoothing (DCA / Combo).** Three new optional fields on an
+  indicator entry of type RSI, CCI, MFI, WR, UO, MOM, AO, ADX, BBPB, KCPB,
+  BBW, VO or MAR:
+  - `smoothing`: `'sma' | 'ema' | 'wma' | 'dema' | 'tema' | 'hma' | 'rma'`
+    (case-insensitive). Missing, null, `'none'` or any other value = off.
+  - `smoothingLength`: length of that average (1 to 1000). Missing, null,
+    `0` or out of range = off.
+  - `smoothingCompare`: `'value'` (default when missing) or `'line'`.
+
+  With smoothing on and `'value'`, every condition of that indicator (`cu`,
+  `cd`, `gt`, `lt`, `bw` and percentile mode) reads the smoothed line
+  instead of the indicator's own line, and the percentile ranks the smoothed
+  line. With `'line'` (and percentile off) the condition compares the
+  indicator's own line against the smoothed line: `gt` above, `lt` below,
+  `cu` / `cd` crossing it, with the same crossing rule as value crossings.
+  The value fields are ignored in that mode and `bw` never fires.
+  Percentile mode overrides `'line'`. The warm-up grows by the average's
+  run-up. Other indicator types, including cross-oscillator (`xo`) entries,
+  ignore the fields. The MAR trend filter keeps reading the unsmoothed
+  ratio.
+- `SmoothingCompareEnum` and the `Smoothing` config mix-in.
+
+### Unchanged
+
+- A bot whose smoothing is missing or off produces exactly the same
+  backtest as before, for every type above (pinned by golden results
+  recorded from 1.13.0, plain and percentile, eight off-variants each).
+
+### Requires
+
+- `@gainium/indicators` 1.5.0 or later (oscillator smoothing support).
+
 ## [1.13.0] - 2026-10-12
 
 ### Added
