@@ -161,9 +161,7 @@ describe('cooldown after deal stop — trigger', () => {
     }
     // a winning close re-enters straight away (ASAP)
     expect(
-      gaps.some(
-        ({ deal, gapHours }) => deal.profit.total > 0 && gapHours < 2,
-      ),
+      gaps.some(({ deal, gapHours }) => deal.profit.total > 0 && gapHours < 2),
     ).to.equal(true)
     expect(deals.length).to.be.greaterThan(
       (await run(cooldown(CooldownStopTriggerEnum.any))).length,
