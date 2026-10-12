@@ -1,3 +1,4 @@
+import { groupStandsAlone } from './ti/groupLogic'
 import { v4 } from 'uuid'
 import { StrategyContextManager } from './context'
 import { checkNumber } from '../../helper/utils'
@@ -4900,8 +4901,17 @@ export abstract class Strategy implements StrategyInterface {
         : undefined
       const slGroupLogicOr = slGroup?.logic === IndicatorsLogicEnum.or
       const tpGroupLogicOr = tpGroup?.logic === IndicatorsLogicEnum.or
-      const slLogicOr = this.settings.stopDealSlLogic === IndicatorsLogicEnum.or
-      const tpLogicOr = this.settings.stopDealLogic === IndicatorsLogicEnum.or
+      // Whether the unrealized-P&L indicator's group can close on its own.
+      const slLogicOr = groupStandsAlone(
+        slGroups,
+        slGroup?.id,
+        this.settings.stopDealSlLogic,
+      )
+      const tpLogicOr = groupStandsAlone(
+        tpGroups,
+        tpGroup?.id,
+        this.settings.stopDealLogic,
+      )
       const slInidcators = foundInSl
         ? this.settings.indicators.filter(
             (i) =>
@@ -5025,11 +5035,7 @@ export abstract class Strategy implements StrategyInterface {
         value = (foundUnpnl.unpnlValue ?? this.defaultUnpnl) / 100
       }
     }
-    if (
-      section === 'tp' &&
-      (this.settings.stopDealLogic === IndicatorsLogicEnum.and ||
-        !this.settings.stopDealLogic)
-    ) {
+    if (section === 'tp') {
       const foundUnpnl =
         this.settings.dealCloseCondition === CloseConditionEnum.techInd
           ? this.settings.indicators.find(
@@ -5038,7 +5044,20 @@ export abstract class Strategy implements StrategyInterface {
                 i.section !== IndicatorSection.sl,
             )
           : undefined
-      if (foundUnpnl) {
+      // Applies while the P&L indicator is ANDed with others; a P&L group
+      // standing alone between ORs closes by itself instead.
+      const unpnlAnded =
+        !!foundUnpnl &&
+        !groupStandsAlone(
+          this.settings.indicatorGroups.filter(
+            (g) =>
+              g.action === IndicatorAction.closeDeal &&
+              g.section !== IndicatorSection.sl,
+          ),
+          foundUnpnl.groupId,
+          this.settings.stopDealLogic,
+        )
+      if (foundUnpnl && unpnlAnded) {
         isGt =
           (foundUnpnl.unpnlCondition ?? this.defaultUnpnlCondition) ===
           IndicatorStartConditionEnum.gt
