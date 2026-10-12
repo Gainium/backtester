@@ -8,6 +8,7 @@ import type {
   EdgeBacktestEnum,
   DCABacktestingResult,
   DCABacktestHooks,
+  CooldownStopTriggerEnum,
 } from '../../types'
 import type { Indicator } from './ti/index'
 
@@ -70,6 +71,13 @@ export class StrategyContext {
   public lastClosedDeal = 0
   public lastOpenedDealPerSymbol: Map<string, number> = new Map()
   public lastClosedDealPerSymbol: Map<string, number> = new Map()
+  /** Last close that qualified for each conditional cooldown-after-stop trigger. */
+  public lastClosedDealByTrigger: Map<CooldownStopTriggerEnum, number> =
+    new Map()
+  public lastClosedDealByTriggerPerSymbol: Map<
+    CooldownStopTriggerEnum,
+    Map<string, number>
+  > = new Map()
   public lastPricesPerSymbol: Map<string, { avg: number; entry: number }> =
     new Map()
   public lastPrice: Map<string, number> = new Map()
@@ -188,6 +196,8 @@ export class StrategyContext {
     this.lastClosedDeal = 0
     this.lastOpenedDealPerSymbol.clear()
     this.lastClosedDealPerSymbol.clear()
+    this.lastClosedDealByTrigger.clear()
+    this.lastClosedDealByTriggerPerSymbol.clear()
     this.lastPricesPerSymbol.clear()
     this.totalProfit = 0
     this.totalProfitUsd = 0

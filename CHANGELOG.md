@@ -5,6 +5,12 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0] - 2026-10-12
+
+### Added
+
+- **Cooldown after deal stop — trigger (DCA / Combo).** New setting `cooldownAfterDealStopTrigger`: `any` (default, and the behaviour when missing) starts the cooldown after every closed deal; `sl` only after a stop-loss close (fixed, multi, trailing, risk/reward and ATR/ADR stop loss, or a liquidation); `loss` only after a deal that closed with a negative net profit. A conditional cooldown is measured from the last close that matched it, so a winning close inside the window does not shorten it. Trailing take profit and unrealised-P&L indicator closes are not stop losses.
+
 ## [1.12.1] - 2026-10-09
 
 ### Fixed

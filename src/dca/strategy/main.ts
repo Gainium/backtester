@@ -25,6 +25,7 @@ import {
   OrderSizeTypeEnum,
   ComboTpBase,
   CooldownOptionsEnum,
+  CooldownStopTriggerEnum,
   CloseDCATypeEnum,
   DynamicPriceFilterPriceTypeEnum,
   DynamicPriceFilterDirectionEnum,
@@ -314,6 +315,8 @@ export abstract class Strategy implements StrategyInterface {
   public settings: DCABotSettings
 
   private readonly botFunctions: Map<string, DCABotFunctions> = new Map()
+  /** Close orders `getSLOrder` produced for a stop loss (see `closeDeal`). */
+  private readonly stopLossCloses: WeakSet<FullGrid> = new WeakSet()
 
   static get workingShift(): { start: number; end?: number }[] {
     return StrategyContextManager.getActiveContext().workingShift
@@ -563,6 +566,18 @@ export abstract class Strategy implements StrategyInterface {
   }
   static set lastClosedDeal(value: number) {
     StrategyContextManager.getActiveContext().lastClosedDeal = value
+  }
+
+  static get lastClosedDealByTrigger(): Map<CooldownStopTriggerEnum, number> {
+    return StrategyContextManager.getActiveContext().lastClosedDealByTrigger
+  }
+
+  static get lastClosedDealByTriggerPerSymbol(): Map<
+    CooldownStopTriggerEnum,
+    Map<string, number>
+  > {
+    return StrategyContextManager.getActiveContext()
+      .lastClosedDealByTriggerPerSymbol
   }
 
   static get lastOpenedDealPerSymbol(): Map<string, number> {
@@ -1995,11 +2010,24 @@ export abstract class Strategy implements StrategyInterface {
         this.settings.cooldownAfterDealStopOption && this.settings.useMulti
           ? this.settings.cooldownAfterDealStopOption
           : CooldownOptionsEnum.bot
+      const trigger = this.settings.cooldownAfterDealStopTrigger
+      const conditional =
+        trigger === CooldownStopTriggerEnum.sl ||
+        trigger === CooldownStopTriggerEnum.loss
+      // A conditional trigger measures from the last close that matched it,
+      // so a winning close inside the cooldown does not lift it early.
+      const lastTime =
+        cooldownAfterDealStartOption === CooldownOptionsEnum.bot
+          ? conditional
+            ? (Strategy.lastClosedDealByTrigger.get(trigger) ?? 0)
+            : Strategy.lastClosedDeal
+          : conditional
+            ? (Strategy.lastClosedDealByTriggerPerSymbol
+                .get(trigger)
+                ?.get(symbol) ?? 0)
+            : (Strategy.lastClosedDealPerSymbol.get(symbol) ?? 0)
       return (
-        time -
-          (cooldownAfterDealStartOption === CooldownOptionsEnum.bot
-            ? Strategy.lastClosedDeal
-            : (Strategy.lastClosedDealPerSymbol.get(symbol) ?? 0)) >=
+        time - lastTime >=
         this.convertCooldown(
           this.settings.cooldownAfterDealStopInterval,
           this.settings.cooldownAfterDealStopUnits,
@@ -4589,6 +4617,10 @@ export abstract class Strategy implements StrategyInterface {
     let closePrice = 0
     let slOrder: FullGrid | undefined
     let lock = false
+    // whether the close is a stop loss — the live engine's `sl` close
+    // trigger. Trailing take profit and unrealised-P&L indicator closes
+    // are not.
+    let stopLoss = false
     if (
       this.settings.useMultiSl &&
       this.settings.multiSl &&
@@ -4654,6 +4686,9 @@ export abstract class Strategy implements StrategyInterface {
         if (profit) {
           d.profit = profit
         } */
+        if (allFilled) {
+          this.stopLossCloses.add(lastSl)
+        }
         return { deal: d, order: allFilled ? lastSl : undefined }
       }
     } else if (
@@ -4668,6 +4703,7 @@ export abstract class Strategy implements StrategyInterface {
         ) {
           close = true
           closePrice = d.trailingLevel
+          stopLoss = d.trailingMode === TrailingModeEnum.tsl
         }
       }
     } else if (
@@ -4685,6 +4721,7 @@ export abstract class Strategy implements StrategyInterface {
       const diff = this.long ? b.low - refPrice : refPrice - b.high
       if (diff / refPrice - this.userFee * 2 <= sl) {
         close = true
+        stopLoss = true
         closePrice = refPrice * (this.long ? 1 - -sl : 1 + -sl)
       }
     } else if (this.settings.useRiskReward && !Strategy.combo) {
@@ -4697,6 +4734,7 @@ export abstract class Strategy implements StrategyInterface {
           closePrice = order.price
           slOrder = order
           lock = true
+          stopLoss = true
         }
       }
     } else if (this.slAr) {
@@ -4709,6 +4747,7 @@ export abstract class Strategy implements StrategyInterface {
           closePrice = order.price
           slOrder = order
           lock = true
+          stopLoss = true
         }
       }
     } else if (Strategy.combo) {
@@ -4765,6 +4804,7 @@ export abstract class Strategy implements StrategyInterface {
           slPerc >= perc * 100
         ) {
           close = true
+          stopLoss = true
           const requiredPrice = this.profitBase
             ? -(quote * (this.long ? 1 : -1)) /
               (denominator * (slPerc / 100) +
@@ -4784,6 +4824,7 @@ export abstract class Strategy implements StrategyInterface {
           tpPerc <= perc * 100
         ) {
           close = true
+          stopLoss = false
           const requiredPrice = this.profitBase
             ? -(quote * (this.long ? 1 : -1)) /
               (denominator * (tpPerc / 100) +
@@ -4948,6 +4989,9 @@ export abstract class Strategy implements StrategyInterface {
         slOrder = this.getTP(d, slOrder.price, false, true)[0]
       }
       this.updatePositionWithOrder(slOrder, b.symbol)
+      if (stopLoss) {
+        this.stopLossCloses.add(slOrder)
+      }
       return { deal: d, order: slOrder }
     }
     return { deal: d }
@@ -5283,6 +5327,20 @@ export abstract class Strategy implements StrategyInterface {
     Strategy.previousDeal = d
     Strategy.lastClosedDeal = b.time
     Strategy.lastClosedDealPerSymbol.set(d.symbol.pair, b.time)
+    const matched: CooldownStopTriggerEnum[] = []
+    if ((tpOrder && this.stopLossCloses.has(tpOrder)) || liquidationPrice) {
+      matched.push(CooldownStopTriggerEnum.sl)
+    }
+    if (profit && profit.total < 0) {
+      matched.push(CooldownStopTriggerEnum.loss)
+    }
+    for (const trigger of matched) {
+      Strategy.lastClosedDealByTrigger.set(trigger, b.time)
+      const perSymbol =
+        Strategy.lastClosedDealByTriggerPerSymbol.get(trigger) ?? new Map()
+      perSymbol.set(d.symbol.pair, b.time)
+      Strategy.lastClosedDealByTriggerPerSymbol.set(trigger, perSymbol)
+    }
     this.setLastDealPerSymbol(d.symbol.pair, d.id)
     return { deal: d, closePrice }
   }
