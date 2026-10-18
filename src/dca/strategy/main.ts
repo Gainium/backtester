@@ -2081,7 +2081,8 @@ export abstract class Strategy implements StrategyInterface {
               (1 + this.userFee * (position === PositionSide.LONG ? 1 : -1)) */
           : pos === PositionSide.LONG
             ? this.userFee
-            : 1 / this.userFee)
+            : // a 1x short's margin is its whole notional: it is gone when the price doubles
+              2)
 
       if (sameDirection || position.qty === 0) {
         const entryPrice =

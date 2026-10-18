@@ -5,6 +5,17 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.1] - 2026-10-18
+
+### Fixed
+
+- **A 1x futures short is liquidated when the price doubles.** At leverage 1
+  a short's liquidation price was its entry divided by the fee, thousands of
+  times the entry, so it was never reached and a losing short could run past
+  −100% (a real 1x short loses all of its margin when the price doubles). It
+  is now liquidated at twice its entry. 1x longs and leverage above 1x are
+  unchanged.
+
 ## [1.16.0] - 2026-10-18
 
 ### Added
