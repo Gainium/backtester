@@ -409,6 +409,22 @@ class DCABacktesting extends Backtesting {
     }
   }
 
+  public closeAllDealsForPair(pair: string, lastTime?: number) {
+    if (this.strategy) {
+      this.strategy.closeAllDealsForPair(pair, lastTime)
+    }
+  }
+
+  public getCurrentUnrealizedPnLByPair(): Map<
+    string,
+    { unrealizedProfit: number; usage: number }
+  > {
+    if (!this.strategy) {
+      return new Map()
+    }
+    return this.strategy.getUnrealizedProfitByPair()
+  }
+
   public getCurrentUnrealizedPnL(): {
     unrealizedProfit: number
     usage: number

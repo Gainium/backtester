@@ -204,10 +204,15 @@ export type DataType = {
 
 export interface StrategyInterface {
   closeAllDealForAllSymbols(lastTime?: number): void
+  closeAllDealsForPair(pair: string, lastTime?: number): void
   getUnrealizedProfit(): {
     unrealizedProfit: number
     usage: number
   }
+  getUnrealizedProfitByPair(): Map<
+    string,
+    { unrealizedProfit: number; usage: number }
+  >
   getOtherIntervals(): { interval: ExchangeIntervals; countBack: number }[]
   loadData(data: DataType[], start?: number): void
   test(
@@ -4577,6 +4582,22 @@ export abstract class Strategy implements StrategyInterface {
     return { unrealizedProfit, usage }
   }
 
+  /** Open deals' unrealized P&L and usage summed per pair. */
+  public getUnrealizedProfitByPair() {
+    const byPair = new Map<
+      string,
+      { unrealizedProfit: number; usage: number }
+    >()
+    for (const d of Strategy.getDeals('open')) {
+      const up = this.getUnrealizedProfitPerDeal(d)
+      const acc = byPair.get(d.symbol.pair) ?? { unrealizedProfit: 0, usage: 0 }
+      acc.unrealizedProfit += up.unrealizedProfit
+      acc.usage += up.usage
+      byPair.set(d.symbol.pair, acc)
+    }
+    return byPair
+  }
+
   private getSLOrder(d: Deal, b: FullBar): { deal: Deal; order?: FullGrid } {
     const foundInSl =
       this.settings.dealCloseConditionSL === CloseConditionEnum.techInd
@@ -5074,20 +5095,24 @@ export abstract class Strategy implements StrategyInterface {
 
   closeAllDealForAllSymbols(lastTime?: number) {
     for (const symbol of this.symbols.keys()) {
-      const lastPrice = Strategy.lastPrice.get(symbol)
-      if (!lastPrice) {
-        continue
-      }
-      const b: FullBar = {
-        open: lastPrice,
-        close: lastPrice,
-        high: lastPrice,
-        low: lastPrice,
-        time: lastTime || Date.now(),
-        symbol,
-      }
-      this.closeAllDeals(b, true, false, true)
+      this.closeAllDealsForPair(symbol, lastTime)
     }
+  }
+
+  closeAllDealsForPair(pair: string, lastTime?: number) {
+    const lastPrice = Strategy.lastPrice.get(pair)
+    if (!lastPrice) {
+      return
+    }
+    const b: FullBar = {
+      open: lastPrice,
+      close: lastPrice,
+      high: lastPrice,
+      low: lastPrice,
+      time: lastTime || Date.now(),
+      symbol: pair,
+    }
+    this.closeAllDeals(b, true, false, true)
   }
 
   closeAllDeals(b: FullBar, sl = false, ignoreTp = false, stop = false) {

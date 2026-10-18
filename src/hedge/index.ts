@@ -480,14 +480,24 @@ class HedgeBacktesting extends Backtesting {
           }
           lastTime = bar.time
         }
+        // The hedge TP/SL is judged per pair: a pair's long and short deals
+        // are one hedge, and only that pair's deals close when it triggers
+        // (a pair with one leg open is judged on that leg alone).
         this.setLongContext()
-        const longProfit = this.longBacktester.getCurrentUnrealizedPnL()
+        const longByPair = this.longBacktester.getCurrentUnrealizedPnLByPair()
         this.setShortContext()
-        const shortProfit = this.shortBacktester.getCurrentUnrealizedPnL()
-        const usage = longProfit.usage + shortProfit.usage
-        if (usage > 0) {
+        const shortByPair = this.shortBacktester.getCurrentUnrealizedPnLByPair()
+        const pairs = new Set([...longByPair.keys(), ...shortByPair.keys()])
+        for (const pair of pairs) {
+          const longProfit = longByPair.get(pair)
+          const shortProfit = shortByPair.get(pair)
+          const usage = (longProfit?.usage ?? 0) + (shortProfit?.usage ?? 0)
+          if (usage <= 0) {
+            continue
+          }
           const profit =
-            longProfit.unrealizedProfit + shortProfit.unrealizedProfit
+            (longProfit?.unrealizedProfit ?? 0) +
+            (shortProfit?.unrealizedProfit ?? 0)
           const relativeUnPnl = (profit / usage) * 100
           if (
             (this.sharedSettings.useSl &&
@@ -497,10 +507,14 @@ class HedgeBacktesting extends Backtesting {
               this.sharedSettings.tpPerc &&
               relativeUnPnl >= +this.sharedSettings.tpPerc)
           ) {
-            this.setLongContext()
-            this.longBacktester.closeAllDeals(lastTime)
-            this.setShortContext()
-            this.shortBacktester.closeAllDeals(lastTime)
+            if (longProfit) {
+              this.setLongContext()
+              this.longBacktester.closeAllDealsForPair(pair, lastTime)
+            }
+            if (shortProfit) {
+              this.setShortContext()
+              this.shortBacktester.closeAllDealsForPair(pair, lastTime)
+            }
           }
         }
         b++

@@ -5,6 +5,17 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.2] - 2026-10-18
+
+### Fixed
+
+- **Hedge take profit / stop loss is judged per pair.** On a multi-pair hedge
+  the combined TP/SL summed every open deal of every pair and closed them all
+  at once, so a pair past its target stayed open while the rest of the basket
+  lagged. Each pair's long and short deals are now one hedge: when that pair's
+  combined P&L reaches the TP or SL, only its deals close. A pair with one leg
+  open is judged on that leg alone. Single-pair hedges are unchanged.
+
 ## [1.15.1] - 2026-10-12
 
 ### Fixed
