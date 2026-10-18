@@ -5,6 +5,16 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.0] - 2026-10-18
+
+### Added
+
+- **Timer start on selected weekdays.** DCA `hodlWeekdays` (0 = Sunday … 6 =
+  Saturday, in the user's timezone) limits a timer to those days. A run that
+  falls on another day opens no deal and moves to the next selected day: a
+  daily timer to its set time that day, an hourly one to the first hour of
+  it. Empty or missing keeps every day, as before.
+
 ## [1.15.2] - 2026-10-18
 
 ### Fixed

@@ -4,6 +4,24 @@ import type { StrategyInput } from './main'
 
 import type { DCABotSettings, FullBar, TradeResponse } from '../../types'
 
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+/** The weekday of `time` in `timeZone` (runtime zone when unset), 0 = Sunday. */
+export const timerWeekday = (time: number, timeZone?: string): number =>
+  WEEKDAYS.indexOf(
+    new Date(time).toLocaleDateString('en-US', { timeZone, weekday: 'short' }),
+  )
+
+/** The selected weekdays, or null when every day is allowed. */
+export const allowedTimerWeekdays = (
+  weekdays?: number[] | null,
+): Set<number> | null => {
+  const days = (weekdays ?? []).filter(
+    (d) => Number.isInteger(d) && d >= 0 && d <= 6,
+  )
+  return days.length && days.length < 7 ? new Set(days) : null
+}
+
 class TimerStrategy extends Strategy implements StrategyInterface {
   public settings: DCABotSettings
 
@@ -60,15 +78,25 @@ class TimerStrategy extends Strategy implements StrategyInterface {
       }
     }
     if (trade.timestamp === next) {
-      this.openDeal(
-        +trade.price,
-        trade.timestamp,
-        +trade.price,
-        +trade.price,
-        trade.symbol,
-      )
+      const weekdays = allowedTimerWeekdays(this.settings.hodlWeekdays)
+      if (!weekdays || weekdays.has(timerWeekday(next, this.timezone))) {
+        this.openDeal(
+          +trade.price,
+          trade.timestamp,
+          +trade.price,
+          +trade.price,
+          trade.symbol,
+        )
+      }
       const date = new Date(next)
       date.setDate(date.getDate() + +this.settings.hodlDay)
+      for (
+        let i = 0;
+        weekdays && i < 7 && !weekdays.has(timerWeekday(+date, this.timezone));
+        i++
+      ) {
+        date.setDate(date.getDate() + 1)
+      }
       next = date.getTime()
     }
     this.checkDeals(false, {
@@ -130,6 +158,9 @@ class TimerStrategy extends Strategy implements StrategyInterface {
       }
     }
     if (bar.time === next) {
+      const weekdays = allowedTimerWeekdays(this.settings.hodlWeekdays)
+      const allowed =
+        !weekdays || weekdays.has(timerWeekday(next, this.timezone))
       const date = new Date(next)
       if (this.settings.hodlHourly) {
         // elapsed hours, like the live bot: setHours steps the local clock
@@ -146,8 +177,25 @@ class TimerStrategy extends Strategy implements StrategyInterface {
         !isNaN(+this.settings.maxDealsPerPair)
           ? +this.settings.maxDealsPerPair
           : 1
-      for (const _ of [...Array(maxPerSymbol).keys()]) {
-        this.openDeal(bar.open, bar.time, bar.high, bar.low, bar.symbol)
+      if (allowed) {
+        for (const _ of [...Array(maxPerSymbol).keys()]) {
+          this.openDeal(bar.open, bar.time, bar.high, bar.low, bar.symbol)
+        }
+      }
+      // a run on a day that is not selected moves to the next selected one:
+      // an hourly timer to the first hour of it, a daily one to its set time
+      for (
+        let i = 0;
+        weekdays &&
+        i < 7 * 24 &&
+        !weekdays.has(timerWeekday(+date, this.timezone));
+        i++
+      ) {
+        if (this.settings.hodlHourly) {
+          date.setTime(+date + 3600000)
+        } else {
+          date.setDate(date.getDate() + 1)
+        }
       }
       next = date.getTime()
     }

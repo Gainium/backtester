@@ -853,6 +853,12 @@ export interface DCABotSettings extends BaseSettings {
   hodlDay: string
   hodlAt: string
   hodlHourly?: boolean
+  /**
+   * Weekdays a timer may open deals on, 0 = Sunday … 6 = Saturday, in the
+   * user's timezone. Empty or missing means every day. A run that falls on
+   * another day moves to the next allowed one.
+   */
+  hodlWeekdays?: number[]
   hodlNextBuy: number
   maxNumberOfOpenDeals?: string
   indicators: SettingsIndicators[]

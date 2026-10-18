@@ -137,3 +137,59 @@ describe('timer strategy across the autumn DST change (Europe/Berlin)', () => {
     ])
   })
 })
+
+describe('timer strategy limited to selected weekdays', () => {
+  let prevTz: string | undefined
+  beforeEach(() => {
+    prevTz = process.env.TZ
+    process.env.TZ = 'UTC'
+  })
+  afterEach(() => {
+    if (prevTz === undefined) delete process.env.TZ
+    else process.env.TZ = prevTz
+  })
+
+  // FROM is Saturday 2026-10-24 22:00 UTC; 10 days of hourly bars
+  const days = 10 * 24
+  const weekdayOf = (iso: string) => new Date(iso).getUTCDay()
+
+  it('a daily timer opens only on the selected weekdays', async () => {
+    const times = await startTimes(
+      { hodlWeekdays: [1, 2, 3, 4, 5], timezone: 'UTC' } as never,
+      mkBars(days),
+    )
+    expect(times.length).to.equal(7)
+    expect(times.every((t) => ![0, 6].includes(weekdayOf(t)))).to.equal(true)
+    expect(times[0]).to.equal('2026-10-26T00:00:00.000Z')
+  })
+
+  it('a single weekday on a daily timer opens once a week', async () => {
+    const times = await startTimes({ hodlWeekdays: [1] } as never, mkBars(days))
+    expect(times).to.deep.equal([
+      '2026-10-26T00:00:00.000Z',
+      '2026-11-02T00:00:00.000Z',
+    ])
+  })
+
+  it('an hourly timer skips the hours of unselected days', async () => {
+    const times = await startTimes(
+      { hodlHourly: true, hodlDay: '6', hodlWeekdays: [0] } as never,
+      mkBars(days),
+    )
+    expect(times.length).to.be.greaterThan(0)
+    expect(times.every((t) => weekdayOf(t) === 0)).to.equal(true)
+  })
+
+  it('no weekdays, or all seven, keeps every day', async () => {
+    const all = await startTimes({}, mkBars(days))
+    expect(
+      await startTimes({ hodlWeekdays: [] } as never, mkBars(days)),
+    ).to.deep.equal(all)
+    expect(
+      await startTimes(
+        { hodlWeekdays: [0, 1, 2, 3, 4, 5, 6] } as never,
+        mkBars(days),
+      ),
+    ).to.deep.equal(all)
+  })
+})
