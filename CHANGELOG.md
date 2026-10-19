@@ -5,6 +5,17 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.0] - 2026-10-19
+
+### Added
+
+- **Hedge results record which deals the hedge TP/SL closed together.**
+  `HedgeBacktestingResult.hedgeCloses` lists every pair the hedge take profit
+  or stop loss closed: the time, `tp` or `sl`, the pair's combined result in %
+  of its usage, and the ids of the long and short deals that closed (ids into
+  `longResult.deals` / `shortResult.deals`). The field is optional; results
+  and the engine's math are otherwise unchanged.
+
 ## [1.16.1] - 2026-10-18
 
 ### Fixed

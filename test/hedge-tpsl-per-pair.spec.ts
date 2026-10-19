@@ -108,4 +108,27 @@ describe('Hedge TP/SL per pair', () => {
     expect(bbbDeals.length).to.equal(2)
     for (const d of bbbDeals) expect(d.status).to.equal('open')
   })
+
+  it('records each hedge close with the deals it closed', async () => {
+    const r = await runHedge()
+    const closes = r.hedgeCloses ?? []
+    const aaaClosed = r.longResult.deals.filter(
+      (d) => d.symbol.pair === one.pair && d.status === 'closed',
+    )
+
+    expect(closes.length, 'one record per hedge close').to.equal(
+      aaaClosed.length,
+    )
+    for (const c of closes) {
+      expect(c.pair).to.equal(one.pair)
+      expect(c.reason).to.equal('tp')
+      expect(c.perc).to.be.at.least(2)
+      // AAA trades on the long leg only
+      expect(c.shortDealIds).to.deep.equal([])
+      expect(c.longDealIds.length).to.equal(1)
+    }
+    expect(closes.flatMap((c) => c.longDealIds).sort()).to.deep.equal(
+      aaaClosed.map((d) => d.id).sort(),
+    )
+  })
 })

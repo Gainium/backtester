@@ -409,6 +409,10 @@ class DCABacktesting extends Backtesting {
     }
   }
 
+  public getOpenDealIdsForPair(pair: string): string[] {
+    return this.strategy ? this.strategy.getOpenDealIdsForPair(pair) : []
+  }
+
   public closeAllDealsForPair(pair: string, lastTime?: number) {
     if (this.strategy) {
       this.strategy.closeAllDealsForPair(pair, lastTime)

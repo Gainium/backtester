@@ -8,6 +8,7 @@ import {
   HedgeBotSettings,
   HedgeBacktestingInput,
   HedgeBacktestingResult,
+  HedgeClose,
   DCABacktestingResult,
   DCABacktestingInput,
   timeIntervalMap,
@@ -38,6 +39,7 @@ class HedgeBacktesting extends Backtesting {
   private longBacktester: DCABacktesting
   private shortBacktester: DCABacktesting
   private sharedSettings?: HedgeBotSettings
+  private hedgeCloses: HedgeClose[] = []
 
   constructor({
     longSettings,
@@ -226,6 +228,7 @@ class HedgeBacktesting extends Backtesting {
     if (this._stop) {
       return
     }
+    this.hedgeCloses = []
     //const startLoading = new Date().getTime()
     const config = this.getIntervalConfig()
 
@@ -499,21 +502,32 @@ class HedgeBacktesting extends Backtesting {
             (longProfit?.unrealizedProfit ?? 0) +
             (shortProfit?.unrealizedProfit ?? 0)
           const relativeUnPnl = (profit / usage) * 100
-          if (
-            (this.sharedSettings.useSl &&
-              this.sharedSettings.slPerc &&
-              relativeUnPnl <= +this.sharedSettings.slPerc) ||
-            (this.sharedSettings.useTp &&
-              this.sharedSettings.tpPerc &&
-              relativeUnPnl >= +this.sharedSettings.tpPerc)
-          ) {
-            if (longProfit) {
-              this.setLongContext()
-              this.longBacktester.closeAllDealsForPair(pair, lastTime)
-            }
-            if (shortProfit) {
-              this.setShortContext()
-              this.shortBacktester.closeAllDealsForPair(pair, lastTime)
+          const hitSl = !!(
+            this.sharedSettings.useSl &&
+            this.sharedSettings.slPerc &&
+            relativeUnPnl <= +this.sharedSettings.slPerc
+          )
+          const hitTp = !!(
+            this.sharedSettings.useTp &&
+            this.sharedSettings.tpPerc &&
+            relativeUnPnl >= +this.sharedSettings.tpPerc
+          )
+          if (hitSl || hitTp) {
+            const longDealIds = longProfit
+              ? this.closePairOn('long', pair, lastTime)
+              : []
+            const shortDealIds = shortProfit
+              ? this.closePairOn('short', pair, lastTime)
+              : []
+            if (longDealIds.length || shortDealIds.length) {
+              this.hedgeCloses.push({
+                pair,
+                time: lastTime,
+                reason: hitSl ? 'sl' : 'tp',
+                perc: this.math.round(relativeUnPnl),
+                longDealIds,
+                shortDealIds,
+              })
             }
           }
         }
@@ -563,6 +577,25 @@ class HedgeBacktesting extends Backtesting {
     }
   }
 
+  /** Closes a pair's open deals on one leg; returns the ids that closed. */
+  private closePairOn(
+    leg: 'long' | 'short',
+    pair: string,
+    lastTime: number,
+  ): string[] {
+    const backtester =
+      leg === 'long' ? this.longBacktester : this.shortBacktester
+    if (leg === 'long') {
+      this.setLongContext()
+    } else {
+      this.setShortContext()
+    }
+    const before = backtester.getOpenDealIdsForPair(pair)
+    backtester.closeAllDealsForPair(pair, lastTime)
+    const after = new Set(backtester.getOpenDealIdsForPair(pair))
+    return before.filter((id) => !after.has(id))
+  }
+
   private createHedgeResult(
     longResult: DCABacktestingResult,
     shortResult: DCABacktestingResult,
@@ -603,6 +636,7 @@ class HedgeBacktesting extends Backtesting {
     const result: HedgeBacktestingResult = {
       longResult,
       shortResult,
+      hedgeCloses: this.hedgeCloses,
       hedgeResult: {
         financial: {
           netProfitTotal:

@@ -2092,6 +2092,18 @@ export interface HedgeTestBarsInput {
   short: { bar: FullBar[]; interval: ExchangeIntervals }[]
 }
 
+/** One pair closed by the hedge take profit / stop loss: the long and short
+ *  deals that closed together, by their deal ids in longResult/shortResult. */
+export interface HedgeClose {
+  pair: string
+  time: number
+  reason: 'tp' | 'sl'
+  /** The pair's combined unrealized PnL at the close, % of its usage. */
+  perc: number
+  longDealIds: string[]
+  shortDealIds: string[]
+}
+
 export interface HedgeBacktestingResult {
   longResult: DCABacktestingResult
   shortResult: DCABacktestingResult
@@ -2099,4 +2111,7 @@ export interface HedgeBacktestingResult {
     DCABacktestingResult,
     'financial' | 'duration' | 'usage' | 'numerical' | 'ratios'
   >
+  /** Pairs the hedge take profit / stop loss closed, in time order. Absent
+   *  on results from versions that did not record them. */
+  hedgeCloses?: HedgeClose[]
 }

@@ -205,6 +205,7 @@ export type DataType = {
 export interface StrategyInterface {
   closeAllDealForAllSymbols(lastTime?: number): void
   closeAllDealsForPair(pair: string, lastTime?: number): void
+  getOpenDealIdsForPair(pair: string): string[]
   getUnrealizedProfit(): {
     unrealizedProfit: number
     usage: number
@@ -5098,6 +5099,10 @@ export abstract class Strategy implements StrategyInterface {
     for (const symbol of this.symbols.keys()) {
       this.closeAllDealsForPair(symbol, lastTime)
     }
+  }
+
+  getOpenDealIdsForPair(pair: string): string[] {
+    return Strategy.getDeals('open', pair).map((d) => d.id)
   }
 
   closeAllDealsForPair(pair: string, lastTime?: number) {
