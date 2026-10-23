@@ -5,6 +5,16 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.0] - 2026-10-23
+
+### Added
+
+- **Session hours in backtests.** The Session indicator reads
+  `sessionStart`, `sessionEnd` (local `HH:MM`) and `sessionTimezone` (IANA,
+  default UTC) and passes them to `@gainium/indicators` 1.6.0's
+  `isInSession`, so a backtest opens deals only inside the session's hours.
+  Settings without them keep the whole-day behaviour.
+
 ## [1.17.0] - 2026-10-19
 
 ### Added

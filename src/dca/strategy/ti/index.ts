@@ -948,6 +948,11 @@ class TIStrategy extends Strategy implements StrategyInterface {
       nextBar.time,
       sessionSettings.sessionDays ?? [1, 2, 3, 4, 5],
       sessionSettings.sessionRule ?? SessionRuleEnum.in,
+      {
+        start: sessionSettings.sessionStart,
+        end: sessionSettings.sessionEnd,
+        timezone: sessionSettings.sessionTimezone,
+      },
     )
     Strategy.indicators = Strategy.indicators.map((ind) => {
       if (
