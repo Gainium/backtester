@@ -24,9 +24,9 @@ work here even though it was "just a factory registration" upstream.
 
 0. **`src/types.ts` — easy to miss.** This repo does **not** import the
    platform's `IndicatorEnum`/config — it redefines them. Add: the
-   `IndicatorEnum` entry; supporting enums; **both** config unions (the
-   file carries a runtime `IndicatorConfig` *and* a separate
-   backtesting-input union); the `IndicatorHistory` member (importing the
+   `IndicatorEnum` entry; supporting enums; the `IndicatorConfigBackTesting`
+   union member (one union — some older entries appear in it twice by
+   mistake; add yours once); the `IndicatorHistory` member (importing the
    result type from `@gainium/indicators`); the optional
    `SettingsIndicators` fields. Skipping this file because "the indicators
    package already has the enum" is the most common way this repo's PR
@@ -57,6 +57,18 @@ Under `src/dca/strategy/ti/` (skip all three for a time filter — see below):
    start condition, asserting every deal opens on the bar after a bar where
    the indicators package's own class + decision fire
    (`test/ote.spec.ts`).
+
+**Time-aware indicators**: none of the loader's feed branches pass the
+candle time by default — give the class its own branch that passes
+`time` (Session Price levels). The interval comes from the stored
+`indicatorInterval`; the backtester supplies no per-indicator default, so
+the bot form / API defaults must store one.
+
+**Hybrid types** (Session: `in`/`out` clock filter, `levels` candle
+indicator): one helper decides which instances are clock filters, every
+clock path (build-loop skip, placeholder entries, per-bar stamping, the
+skip in `checkIndicators`) uses it, and each clock instance is stamped from
+its own settings — never "the first one of the type".
 
 **A time/calendar filter is the exception**: no indicator instance, no
 `indicatorLoader` branch. Instead `index.ts` carries an exclusion flag,
