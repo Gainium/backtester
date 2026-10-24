@@ -42,6 +42,7 @@ import {
   DonchianChannels,
   OBFVG,
   LongWick,
+  OTELevels,
   SmoothedIndicator,
   getSmoothingWarmup,
   isSmoothableIndicator,
@@ -101,6 +102,7 @@ export default class InternalIndicator {
     | DonchianChannels
     | OBFVG
     | LongWick
+    | OTELevels
     | SmoothedIndicator
   private data: IndicatorHistory[] = []
 
@@ -585,6 +587,13 @@ export default class InternalIndicator {
       )
       this.length = 201
     }
+    if (indicatorConfig.type === IndicatorEnum.ote) {
+      this.indicator = new OTELevels(
+        indicatorConfig.oteLeftBars ?? 10,
+        indicatorConfig.oteMinLegSize ?? 1,
+      )
+      this.length = 1000
+    }
     if (smoothingConfig && this.indicator) {
       this.indicator = new SmoothedIndicator(
         this.indicator as ConstructorParameters<typeof SmoothedIndicator>[0],
@@ -686,7 +695,8 @@ export default class InternalIndicator {
         kind instanceof ECD ||
         kind instanceof DonchianChannels ||
         kind instanceof OBFVG ||
-        kind instanceof LongWick)
+        kind instanceof LongWick ||
+        kind instanceof OTELevels)
     ) {
       target.next({
         high: +value.h,

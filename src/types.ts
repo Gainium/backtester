@@ -11,6 +11,7 @@ import type {
   DCResult,
   OBFVGResult,
   LongWickResult,
+  OTEResult,
 } from '@gainium/indicators'
 
 export const DirName = `../../tmp-backtester`
@@ -56,6 +57,7 @@ export enum IndicatorEnum {
   obfvg = 'OBFVG',
   session = 'SESSION',
   lw = 'LW',
+  ote = 'OTE',
 }
 
 export enum SessionRuleEnum {
@@ -66,6 +68,13 @@ export enum SessionRuleEnum {
 export enum LWValueEnum {
   top = 'top',
   bottom = 'bottom',
+  any = 'any',
+}
+
+/** Which leg direction an OTE Levels condition reads. */
+export enum OTELegEnum {
+  bullish = 'bullish',
+  bearish = 'bearish',
   any = 'any',
 }
 
@@ -247,6 +256,7 @@ export enum RangeType {
 
 export type IndicatorConfigBackTesting =
   | { type: IndicatorEnum.lw; lwThreshold: number; lwMaxDuration: number }
+  | { type: IndicatorEnum.ote; oteLeftBars: number; oteMinLegSize: number }
   | { type: IndicatorEnum.obfvg }
   | { type: IndicatorEnum.dc; length: number }
   | {
@@ -397,6 +407,7 @@ export type IndicatorConfigBackTesting =
     } & Percentile &
       Smoothing)
   | { type: IndicatorEnum.lw; lwThreshold: number; lwMaxDuration: number }
+  | { type: IndicatorEnum.ote; oteLeftBars: number; oteMinLegSize: number }
 
 type PercentileResult = {
   percentile?: number
@@ -465,6 +476,7 @@ export type IndicatorHistory = { time: number } & (
   | { type: IndicatorEnum.psar; value: { psar: number; price: number } }
   | { type: IndicatorEnum.dc; value: DCResult }
   | { type: IndicatorEnum.lw; value: LongWickResult }
+  | { type: IndicatorEnum.ote; value: OTEResult }
   | { type: IndicatorEnum.session; value: boolean }
 )
 
@@ -609,6 +621,13 @@ export type SettingsIndicators = {
   lwMaxDuration?: string
   lwValue?: LWValueEnum
   lwCondition?: LWConditionEnum
+  /** OTE Levels: bars to the left a swing must dominate. */
+  oteLeftBars?: string
+  /** OTE Levels: minimum leg size, % of the leg's low. */
+  oteMinLegSize?: string
+  /** OTE Levels: retracement level price is compared with (0 = leg end, 1 = origin). */
+  oteLevel?: string
+  oteLeg?: OTELegEnum
 }
 
 export enum LWConditionEnum {

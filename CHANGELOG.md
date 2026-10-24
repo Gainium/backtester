@@ -5,6 +5,17 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.19.0] - 2026-10-24
+
+### Added
+
+- **Discount / Premium OTE Levels (`IndicatorEnum.ote`).** Settings
+  `oteLeftBars` (default 10), `oteMinLegSize` (% of the leg's low, default
+  1), `oteLevel` (retracement, default 0.705), `oteLeg`
+  (`bullish` / `bearish` / `any`) and `indicatorCondition` (`cd`, `cu`, `gt`,
+  `lt`). Built on `@gainium/indicators` 1.7.0's `OTELevels`; the signal is
+  that package's `oteCondition`, the same decision the live engine uses.
+
 ## [1.18.0] - 2026-10-23
 
 ### Added
