@@ -39,7 +39,10 @@ Under `src/dca/strategy/ti/` (skip all three for a time filter — see below):
    branch that builds it and sets `this.length` (the warmup window this
    loader requests — computed **by hand here**, it does not call
    `getWarmupCandles`; keep it in sync with the indicators package's
-   warmup value or the two will silently disagree).
+   warmup value or the two will silently disagree). **Also add the class
+   to this loader's own `instanceof` feed list** for its input shape — the
+   loader does not use the indicators package's `feedCandle`, so a class
+   missing there is never fed.
 2. **`index.ts` (strategy)** — in the constructor's indicator-build loop,
    add the branch that passes your config through to build the
    `InternalIndicator`.
@@ -47,7 +50,13 @@ Under `src/dca/strategy/ti/` (skip all three for a time filter — see below):
    indicator's latest/previous `IndicatorHistory` value onto the
    `last / prev / value / prevValue` comparison the strategy uses to fire
    — the same cross/threshold shape as main-app's
-   `checkIndicatorConditions`.
+   `checkIndicatorConditions`. If the indicators package exports the
+   indicator's decision as a function, call it here instead of writing
+   the comparison again.
+4. **`test/<name>.spec.ts`** — a DCA backtest with the indicator as the
+   start condition, asserting every deal opens on the bar after a bar where
+   the indicators package's own class + decision fire
+   (`test/ote.spec.ts`).
 
 **A time/calendar filter is the exception**: no indicator instance, no
 `indicatorLoader` branch. Instead `index.ts` carries an exclusion flag,
