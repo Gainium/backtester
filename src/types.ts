@@ -76,6 +76,8 @@ export enum SessionLevelEnum {
   prevLow = 'prevLow',
   prevClose = 'prevClose',
   curOpen = 'curOpen',
+  /** (highest high + lowest low) / 2 of the session in progress so far */
+  curMid = 'curMid',
   price = 'price',
 }
 

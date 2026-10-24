@@ -201,6 +201,12 @@ describe('Session Price levels start condition', () => {
       b: SessionLevelEnum.curOpen,
       condition: IndicatorStartConditionEnum.lt,
     },
+    // the current-session midpoint moves with the session's high / low
+    {
+      a: SessionLevelEnum.price,
+      b: SessionLevelEnum.curMid,
+      condition: IndicatorStartConditionEnum.cu,
+    },
   ]
   for (const levels of cases) {
     it(`opens deals only after ${levels.a} ${levels.condition} ${levels.b} signal bars`, async () => {

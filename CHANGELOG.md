@@ -5,6 +5,17 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.21.0] - 2026-10-24
+
+### Added
+
+- **Session "Price levels": current session midpoint (`SessionLevelEnum.curMid`).**
+  The (highest high + lowest low) / 2 of the session in progress so far,
+  including the latest candle; it moves as the session makes new highs and
+  lows and has no value outside the session. Crossings against it count like
+  against a moving average, within one session. Requires
+  `@gainium/indicators` 1.9.0.
+
 ## [1.20.0] - 2026-10-24
 
 ### Added
