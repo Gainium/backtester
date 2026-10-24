@@ -61,6 +61,8 @@ import {
   LongWickResult,
   OTEResult,
   oteCondition,
+  SessionLevelsResult,
+  sessionLevelsCondition,
   SmoothedResult,
   isInSession,
 } from '@gainium/indicators'
@@ -71,6 +73,14 @@ type Status = {
   statusTo: number
   numberOfSignals?: number
 }
+
+/**
+ * A Session with rule in / out (missing = in) is a clock filter: no candle
+ * indicator, its status is stamped per bar from the bar's time. A Session with
+ * rule levels (Price levels) is a normal candle indicator. A bot may carry both.
+ */
+const isClockSession = (i: SettingsIndicators) =>
+  i.type === IndicatorEnum.session && i.sessionRule !== SessionRuleEnum.levels
 
 export type Indicator = {
   instance: InternalIndicator
@@ -103,13 +113,10 @@ class TIStrategy extends Strategy implements StrategyInterface {
       const ind = (indicators ?? []).filter((i) => i.groupId === ig.id)
       return ind.length > 0
     })
-    this.hasSessionInd = !!indicators?.find(
-      (i) => i.type === IndicatorEnum.session,
-    )
+    this.hasSessionInd = !!indicators?.find(isClockSession)
     for (const s of input.symbols) {
       for (const i of indicators.filter(
-        (_i) =>
-          _i.type !== IndicatorEnum.unpnl && _i.type !== IndicatorEnum.session,
+        (_i) => _i.type !== IndicatorEnum.unpnl && !isClockSession(_i),
       )) {
         const {
           type,
@@ -186,6 +193,10 @@ class TIStrategy extends Strategy implements StrategyInterface {
           lwMaxDuration,
           oteLeftBars,
           oteMinLegSize,
+          sessionDays,
+          sessionStart,
+          sessionEnd,
+          sessionTimezone,
         } = i
         const scaleAr =
           (this.settings.dcaCondition === DCAConditionEnum.percentage ||
@@ -544,14 +555,32 @@ class TIStrategy extends Strategy implements StrategyInterface {
                                                                           ? {
                                                                               type,
                                                                             }
-                                                                          : ({
-                                                                              type,
-                                                                              interval:
-                                                                                indicatorLength,
-                                                                              percentile,
-                                                                              percentileLookback,
-                                                                              percentilePercentage,
-                                                                            } as IndicatorConfigBackTesting)
+                                                                          : type ===
+                                                                              IndicatorEnum.session
+                                                                            ? {
+                                                                                type,
+                                                                                sessionRule:
+                                                                                  SessionRuleEnum.levels,
+                                                                                sessionDays:
+                                                                                  sessionDays ?? [
+                                                                                    1,
+                                                                                    2,
+                                                                                    3,
+                                                                                    4,
+                                                                                    5,
+                                                                                  ],
+                                                                                sessionStart,
+                                                                                sessionEnd,
+                                                                                sessionTimezone,
+                                                                              }
+                                                                            : ({
+                                                                                type,
+                                                                                interval:
+                                                                                  indicatorLength,
+                                                                                percentile,
+                                                                                percentileLookback,
+                                                                                percentilePercentage,
+                                                                              } as IndicatorConfigBackTesting)
         const ind = new InternalIndicator(withSmoothing(i, indicatorConfig))
         Strategy.indicators.push({
           instance: ind,
@@ -635,11 +664,8 @@ class TIStrategy extends Strategy implements StrategyInterface {
         }
       }
     }
-    // Add session mock indicators for each symbol
-    const sessionIndicator = (indicators ?? []).find(
-      (i) => i.type === IndicatorEnum.session,
-    )
-    if (sessionIndicator) {
+    // Add session mock indicators (in / out clock filters) for each symbol
+    for (const sessionIndicator of (indicators ?? []).filter(isClockSession)) {
       for (const s of input.symbols) {
         Strategy.indicators.push({
           instance: null as unknown as InternalIndicator,
@@ -959,25 +985,20 @@ class TIStrategy extends Strategy implements StrategyInterface {
   }
 
   private updateSessionIndicatorStatus(nextBar: FullBar) {
-    const sessionSettings = this.settings.indicators?.find(
-      (i) => i.type === IndicatorEnum.session,
-    )
-    if (!sessionSettings) return
-    const inSession = isInSession(
-      nextBar.time,
-      sessionSettings.sessionDays ?? [1, 2, 3, 4, 5],
-      sessionSettings.sessionRule ?? SessionRuleEnum.in,
-      {
-        start: sessionSettings.sessionStart,
-        end: sessionSettings.sessionEnd,
-        timezone: sessionSettings.sessionTimezone,
-      },
-    )
+    if (!this.hasSessionInd) return
     Strategy.indicators = Strategy.indicators.map((ind) => {
-      if (
-        ind.settings.type === IndicatorEnum.session &&
-        ind.symbol === nextBar.symbol
-      ) {
+      if (isClockSession(ind.settings) && ind.symbol === nextBar.symbol) {
+        const sessionSettings = ind.settings
+        const inSession = isInSession(
+          nextBar.time,
+          sessionSettings.sessionDays ?? [1, 2, 3, 4, 5],
+          sessionSettings.sessionRule ?? SessionRuleEnum.in,
+          {
+            start: sessionSettings.sessionStart,
+            end: sessionSettings.sessionEnd,
+            timezone: sessionSettings.sessionTimezone,
+          },
+        )
         ind.status = {
           status: inSession,
           statusSince: 0,
@@ -1050,7 +1071,7 @@ class TIStrategy extends Strategy implements StrategyInterface {
       )
       //Strategy.indicators = Strategy.indicators.map((i) => ({ ...i, data: [] }))
       for (const i of currentState) {
-        if (i.settings.type === IndicatorEnum.session) continue
+        if (isClockSession(i.settings)) continue
         let action = false
         let skipAction = false
         let trendFilterAction = false
@@ -1095,6 +1116,8 @@ class TIStrategy extends Strategy implements StrategyInterface {
             lwValue,
             oteLevel,
             oteLeg,
+            sessionLevelA,
+            sessionLevelB,
           },
           data,
         } = i
@@ -1259,6 +1282,18 @@ class TIStrategy extends Strategy implements StrategyInterface {
             {
               level: +(oteLevel || 0.705),
               leg: oteLeg,
+              condition: indicatorCondition,
+            },
+          )
+        } else if (type === IndicatorEnum.session) {
+          // Price levels (clock sessions were skipped above)
+          const [ld, pd] = [...data].sort((a, b) => b.time - a.time)
+          action = sessionLevelsCondition(
+            ld?.value as SessionLevelsResult,
+            pd?.value as SessionLevelsResult,
+            {
+              a: sessionLevelA,
+              b: sessionLevelB,
               condition: indicatorCondition,
             },
           )

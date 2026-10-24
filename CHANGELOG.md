@@ -5,6 +5,27 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.0] - 2026-10-24
+
+### Added
+
+- **Session "Price levels" rule (`SessionRuleEnum.levels`).** A Session
+  indicator with rule `levels` compares two session levels
+  (`SessionLevelEnum`: previous session open / high / midpoint / low / close,
+  current session open, price) chosen by `sessionLevelA` (default `price`)
+  and `sessionLevelB` (default `prevHigh`) with `indicatorCondition` (`cd`,
+  `cu`, `gt`, `lt`) on `indicatorInterval` candles. Built on
+  `@gainium/indicators` 1.8.0's `SessionLevels`, fed with each candle's open
+  time; the signal is that package's `sessionLevelsCondition`, the same
+  decision the live engine uses. It fires only inside the session window.
+
+### Changed
+
+- The Session in / out clock filter now handles only rules `in` / `out`
+  (missing = `in`), and every such Session in a bot is stamped from its own
+  settings, so a bot can combine an in / out Session with Price-levels
+  Sessions. In / out behaviour is unchanged.
+
 ## [1.19.0] - 2026-10-24
 
 ### Added

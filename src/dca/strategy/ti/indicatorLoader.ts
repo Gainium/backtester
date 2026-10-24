@@ -43,6 +43,7 @@ import {
   OBFVG,
   LongWick,
   OTELevels,
+  SessionLevels,
   SmoothedIndicator,
   getSmoothingWarmup,
   isSmoothableIndicator,
@@ -103,6 +104,7 @@ export default class InternalIndicator {
     | OBFVG
     | LongWick
     | OTELevels
+    | SessionLevels
     | SmoothedIndicator
   private data: IndicatorHistory[] = []
 
@@ -594,6 +596,15 @@ export default class InternalIndicator {
       )
       this.length = 1000
     }
+    // Session "Price levels" (in / out sessions are clock filters, never built here)
+    if (indicatorConfig.type === IndicatorEnum.session) {
+      this.indicator = new SessionLevels(indicatorConfig.sessionDays ?? [], {
+        start: indicatorConfig.sessionStart,
+        end: indicatorConfig.sessionEnd,
+        timezone: indicatorConfig.sessionTimezone,
+      })
+      this.length = 1500
+    }
     if (smoothingConfig && this.indicator) {
       this.indicator = new SmoothedIndicator(
         this.indicator as ConstructorParameters<typeof SmoothedIndicator>[0],
@@ -703,6 +714,16 @@ export default class InternalIndicator {
         low: +value.l,
         close: +value.c,
         open: +value.o,
+      })
+    }
+    // grouped into sessions by the candle's open time
+    if (this.indicator && kind instanceof SessionLevels) {
+      target.next({
+        high: +value.h,
+        low: +value.l,
+        close: +value.c,
+        open: +value.o,
+        time,
       })
     }
     if (this.indicator && kind instanceof AO) {

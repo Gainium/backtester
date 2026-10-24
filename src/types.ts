@@ -12,6 +12,7 @@ import type {
   OBFVGResult,
   LongWickResult,
   OTEResult,
+  SessionLevelsResult,
 } from '@gainium/indicators'
 
 export const DirName = `../../tmp-backtester`
@@ -63,6 +64,19 @@ export enum IndicatorEnum {
 export enum SessionRuleEnum {
   in = 'in',
   out = 'out',
+  /** Price levels: compare two session levels (a candle indicator, not a clock filter) */
+  levels = 'levels',
+}
+
+/** A value a Session "Price levels" condition can read. */
+export enum SessionLevelEnum {
+  prevOpen = 'prevOpen',
+  prevHigh = 'prevHigh',
+  prevMid = 'prevMid',
+  prevLow = 'prevLow',
+  prevClose = 'prevClose',
+  curOpen = 'curOpen',
+  price = 'price',
 }
 
 export enum LWValueEnum {
@@ -257,6 +271,14 @@ export enum RangeType {
 export type IndicatorConfigBackTesting =
   | { type: IndicatorEnum.lw; lwThreshold: number; lwMaxDuration: number }
   | { type: IndicatorEnum.ote; oteLeftBars: number; oteMinLegSize: number }
+  | {
+      type: IndicatorEnum.session
+      sessionRule: SessionRuleEnum.levels
+      sessionDays: number[]
+      sessionStart?: string
+      sessionEnd?: string
+      sessionTimezone?: string
+    }
   | { type: IndicatorEnum.obfvg }
   | { type: IndicatorEnum.dc; length: number }
   | {
@@ -477,7 +499,8 @@ export type IndicatorHistory = { time: number } & (
   | { type: IndicatorEnum.dc; value: DCResult }
   | { type: IndicatorEnum.lw; value: LongWickResult }
   | { type: IndicatorEnum.ote; value: OTEResult }
-  | { type: IndicatorEnum.session; value: boolean }
+  /** in / out: the clock filter's status; levels: the SessionLevels result */
+  | { type: IndicatorEnum.session; value: boolean | SessionLevelsResult }
 )
 
 export type SettingsIndicators = {
@@ -617,6 +640,10 @@ export type SettingsIndicators = {
   sessionEnd?: string
   /** IANA time zone the session hours and days are read in (default UTC). */
   sessionTimezone?: string
+  /** Session Price levels: left operand (default price). */
+  sessionLevelA?: SessionLevelEnum
+  /** Session Price levels: right operand (default prevHigh). */
+  sessionLevelB?: SessionLevelEnum
   lwThreshold?: string
   lwMaxDuration?: string
   lwValue?: LWValueEnum
