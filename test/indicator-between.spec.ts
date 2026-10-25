@@ -211,4 +211,18 @@ describe('indicator condition "between" (bw)', () => {
     expect(between.length).to.be.greaterThan(0)
     expect(between).to.deep.equal(pair)
   })
+
+  it('reads an unset percentile and lookback as the live engine does', async () => {
+    const pct = (extra: Record<string, unknown>) => ({
+      ...(rsi('p', start, lt, '50', 'g') as object),
+      percentile: true,
+      ...extra,
+    })
+    const unset = await run(entry([pct({})]))
+    const engine = await run(
+      entry([pct({ percentileLookback: 150, percentilePercentage: 80 })]),
+    )
+    expect(unset.length).to.be.greaterThan(0)
+    expect(unset).to.deep.equal(engine)
+  })
 })

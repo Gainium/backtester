@@ -157,8 +157,8 @@ class TIStrategy extends Strategy implements StrategyInterface {
           xOscillator2voShort,
           xoUUID,
           percentile,
-          percentileLookback,
-          percentilePercentage,
+          percentileLookback: _percentileLookback,
+          percentilePercentage: _percentilePercentage,
           mar1type,
           mar1length,
           mar2type,
@@ -198,6 +198,9 @@ class TIStrategy extends Strategy implements StrategyInterface {
           sessionEnd,
           sessionTimezone,
         } = i
+        // the live engine's fallbacks (main-app conditions/config.ts)
+        const percentileLookback = _percentileLookback ?? 150
+        const percentilePercentage = _percentilePercentage ?? 80
         const scaleAr =
           (this.settings.dcaCondition === DCAConditionEnum.percentage ||
             !this.settings.dcaCondition) &&
@@ -1550,7 +1553,7 @@ class TIStrategy extends Strategy implements StrategyInterface {
           ) {
             last = lastData.value
             prev = prevData.value
-            value = Math.abs(+(indicatorValue ?? '70')) * -1
+            value = Math.abs(+(indicatorValue ?? '10')) * -1
             prevValue = value
           }
           if (
