@@ -115,6 +115,25 @@ const rsi = (
     uuid: `u-${id}`,
   }) as never
 
+const ath = (
+  id: string,
+  condition: IndicatorStartConditionEnum,
+  value: string,
+  value2?: string,
+) =>
+  ({
+    type: IndicatorEnum.ath,
+    athLookback: 100,
+    indicatorLength: 14,
+    indicatorValue: value,
+    ...(value2 !== undefined ? { indicatorValue2: value2 } : {}),
+    indicatorCondition: condition,
+    indicatorInterval: ExchangeIntervals.oneH,
+    indicatorAction: IndicatorAction.startDeal,
+    groupId: 'g',
+    uuid: `a-${id}`,
+  }) as never
+
 const group = {
   id: 'g',
   logic: IndicatorsLogicEnum.and,
@@ -182,5 +201,14 @@ describe('indicator condition "between" (bw)', () => {
     expect(
       await run(entry([rsi('b', start, bw, '40', 'g', '')])),
     ).to.deep.equal([])
+  })
+
+  it('reads both ATH drawdown bounds as drawdowns', async () => {
+    // ATH Drawdown is negative and its Value is entered as a positive
+    // drawdown: between 3 and 8 means a drawdown from 3% to 8%
+    const between = await run(entry([ath('b', bw, '3', '8')]))
+    const pair = await run(entry([ath('l', lt, '3'), ath('u', gt, '8')]))
+    expect(between.length).to.be.greaterThan(0)
+    expect(between).to.deep.equal(pair)
   })
 })

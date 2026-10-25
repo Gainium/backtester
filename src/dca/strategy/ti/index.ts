@@ -1861,7 +1861,10 @@ class TIStrategy extends Strategy implements StrategyInterface {
           ) {
             const upper =
               indicatorValue2 !== undefined && indicatorValue2 !== ''
-                ? +indicatorValue2
+                ? type === IndicatorEnum.ath
+                  ? // a drawdown is negative, like the Value above
+                    Math.abs(+indicatorValue2) * -1
+                  : +indicatorValue2
                 : NaN
             action =
               !isNaN(upper) &&

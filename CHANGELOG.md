@@ -5,6 +5,16 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.21.1] - 2026-10-25
+
+### Fixed
+
+- **ATH Drawdown "between": the upper value is read as a drawdown too.** The
+  drawdown is negative and its Value was already compared as minus the
+  entered number, but the second bound was compared as entered, so "between
+  3 and 8" tested -3% to +8% and held for any drawdown under 3%. Both bounds
+  are now drawdowns, matching the live bot.
+
 ## [1.21.0] - 2026-10-24
 
 ### Added
