@@ -149,6 +149,9 @@ for (const strategy of ['LONG', 'SHORT'] as const)
       expect(open.every((d) => d.unrealized != null)).to.equal(true)
       expect(closed.every((d) => d.unrealized == null)).to.equal(true)
       const sumUsd = open.reduce((a, d) => a + d.unrealized!.totalUsd, 0)
-      expect(sumUsd).to.be.closeTo(r.financial.unrealizedPnLUsd, 0.01 * open.length)
+      expect(sumUsd).to.be.closeTo(
+        r.financial.unrealizedPnLUsd,
+        0.01 * open.length,
+      )
     })
   })
