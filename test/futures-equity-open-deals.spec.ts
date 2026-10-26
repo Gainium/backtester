@@ -94,7 +94,7 @@ const baseSettings = {
   indicators: [],
 } as unknown as DCABotSettings
 
-const run = async (strategy: 'LONG' | 'SHORT') => {
+const run = async (strategy: 'LONG' | 'SHORT', pricesKeyedByPair = true) => {
   const bars = mkBars(strategy === 'LONG' ? -0.0008 : 0.0006)
   const backtest = new DCABacktesting({
     settings: { ...baseSettings, strategy } as DCABotSettings,
@@ -102,7 +102,12 @@ const run = async (strategy: 'LONG' | 'SHORT') => {
     makerFee: 0.0005,
     takerFee: 0.0005,
     // the open-deal PnL stat values open deals at this price (last close)
-    prices: [{ symbol: PAIR, price: bars[bars.length - 1].close }],
+    prices: [
+      {
+        symbol: pricesKeyedByPair ? PAIR : 'ADA-USDT',
+        price: bars[bars.length - 1].close,
+      },
+    ],
     balances: [],
     interval: ExchangeIntervals.oneH,
     from: FROM,
@@ -153,5 +158,17 @@ for (const strategy of ['LONG', 'SHORT'] as const)
         r.financial.unrealizedPnLUsd,
         0.01 * open.length,
       )
+    })
+
+    it('§4 open deals are valued at the last candle when the price list keys differ', async () => {
+      const keyed = await run(strategy)
+      const r = await run(strategy, false)
+      expect(r.financial.unrealizedPnLUsd).to.not.equal(0)
+      expect(r.financial.unrealizedPnLUsd).to.equal(
+        keyed.financial.unrealizedPnLUsd,
+      )
+      expect(
+        r.deals!.filter((d) => d.status === 'open').every((d) => d.unrealized),
+      ).to.equal(true)
     })
   })

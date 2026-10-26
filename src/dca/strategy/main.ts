@@ -6899,14 +6899,14 @@ export abstract class Strategy implements StrategyInterface {
         if (!symbol) {
           continue
         }
-        const price = this.prices.find((p) => p.symbol === symbol.pair)
-        if (price) {
-          const tp = this.getTP(
-            od,
-            lastData.get(od.symbol.pair)?.close ?? price.price,
-            true,
-            false,
-          )[0]
+        // Value at the last candle; the host's price list is only a fallback.
+        // Its keys need not match symbol.pair (Kraken lists BTC-USDT for
+        // BTCUSDT), and requiring a match dropped the deal from the stat.
+        const markPrice =
+          lastData.get(od.symbol.pair)?.close ??
+          this.prices.find((p) => p.symbol === symbol.pair)?.price
+        if (markPrice != null) {
+          const tp = this.getTP(od, markPrice, true, false)[0]
           const { price: tpPrice } = tp
           const qty = tp?.qty ?? 0
           if (qty === 0) {

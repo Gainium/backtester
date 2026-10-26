@@ -5,6 +5,16 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.22.1] - 2026-10-26
+
+### Fixed
+
+- **Unrealized P&L read 0 when the price list used other symbol keys.** Open
+  deals are valued at the last candle, but the stat skipped any deal whose
+  pair was missing from the host's price list, and some venues key that list
+  differently (`BTC-USDT` for `BTCUSDT`). The price list is now only a
+  fallback for a pair with no candle.
+
 ## [1.22.0] - 2026-10-26
 
 ### Added
