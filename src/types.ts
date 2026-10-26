@@ -1530,6 +1530,12 @@ export type PreparedDeal = {
   }
   /** 1.12.0 — single position: entries the position held, counting the base order */
   positionEntries?: number
+  /** 1.22.0 — open deals only: P&L if closed at the last price; perc is of the deal's usage */
+  unrealized?: {
+    total: number
+    totalUsd: number
+    perc: number
+  }
 }
 
 type Balance = {

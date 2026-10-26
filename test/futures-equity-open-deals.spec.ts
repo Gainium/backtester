@@ -140,4 +140,15 @@ for (const strategy of ['LONG', 'SHORT'] as const)
       const maxOpenNotional = (r.numerical.open + 5) * 6
       expect(-(f.maxDrawDownEquityUsd ?? 0)).to.be.lessThan(maxOpenNotional)
     })
+
+    it('§3 each open deal carries its share of the unrealized PnL', async () => {
+      const r = await run(strategy)
+      const open = r.deals!.filter((d) => d.status === 'open')
+      const closed = r.deals!.filter((d) => d.status === 'closed')
+      expect(open.length).to.be.greaterThan(5)
+      expect(open.every((d) => d.unrealized != null)).to.equal(true)
+      expect(closed.every((d) => d.unrealized == null)).to.equal(true)
+      const sumUsd = open.reduce((a, d) => a + d.unrealized!.totalUsd, 0)
+      expect(sumUsd).to.be.closeTo(r.financial.unrealizedPnLUsd, 0.01 * open.length)
+    })
   })

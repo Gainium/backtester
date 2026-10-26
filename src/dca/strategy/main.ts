@@ -6634,7 +6634,10 @@ export abstract class Strategy implements StrategyInterface {
     return cwr
   }
 
-  private prepareDeals(deals: Deal[]): PreparedDeal[] {
+  private prepareDeals(
+    deals: Deal[],
+    unrealizedByDeal?: Map<string, PreparedDeal['unrealized']>,
+  ): PreparedDeal[] {
     if (Strategy.fullResult) {
       return deals
     }
@@ -6715,6 +6718,9 @@ export abstract class Strategy implements StrategyInterface {
       equity: d.equity,
       equityInAsset: d.equityInAsset,
       ...(d.positionEntries ? { positionEntries: d.positionEntries } : {}),
+      ...(d.status === 'open' && unrealizedByDeal?.has(d.id)
+        ? { unrealized: unrealizedByDeal.get(d.id) }
+        : {}),
     }))
   }
 
@@ -6885,6 +6891,7 @@ export abstract class Strategy implements StrategyInterface {
     let unrealizedPnL = 0
     let unrealizedPnLUsd = 0
     let unrealizedUsage = 0
+    const unrealizedByDeal = new Map<string, PreparedDeal['unrealized']>()
 
     if (openedDeals.length > 0) {
       for (const od of openedDeals) {
@@ -6957,7 +6964,7 @@ export abstract class Strategy implements StrategyInterface {
           const usdRateCurrent = this.usdRate.get(od.symbol.pair) ?? 1
           unrealizedPnL += unPnl
           unrealizedPnLUsd += unPnl * usdRateCurrent
-          unrealizedUsage +=
+          const dealUsage =
             ((Strategy.combo
               ? this.futures
                 ? this.coinm
@@ -6979,6 +6986,18 @@ export abstract class Strategy implements StrategyInterface {
                       .base) /* * (this.profitBase ? 1 : tpPrice) */ /
               this.leverage) *
             this.getRate()
+          unrealizedUsage += dealUsage
+          unrealizedByDeal.set(od.id, {
+            total: this.math.round(
+              unPnl,
+              this.precisionQuote.get(od.symbol.pair),
+            ),
+            totalUsd: this.math.round(unPnl * usdRateCurrent, 2),
+            perc:
+              dealUsage > 0
+                ? this.math.round(((unPnl * usdRateCurrent) / dealUsage) * 100)
+                : 0,
+          })
           /* const baseAmount = od.currentBalance.base / this.leverage
           const quoteAmount = od.currentBalance.quote / this.leverage
           const baseRate = this.getUsdRate(od.symbol.pair, tpPrice, 'base')
@@ -7487,6 +7506,7 @@ export abstract class Strategy implements StrategyInterface {
               filledOrders: [],
             })),
           })),
+        unrealizedByDeal,
       ),
       maxLeverage: allDeals.filter((d) => !!d.liquidationPrice).length
         ? Math.min(

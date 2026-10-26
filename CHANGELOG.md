@@ -5,6 +5,17 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.22.0] - 2026-10-26
+
+### Added
+
+- **Per-deal unrealized P&L on open deals.** Each open DCA deal in the result
+  now carries `unrealized` (`total`, `totalUsd`, `perc`): what closing it at
+  the last price would book, with `perc` relative to that deal's usage. The
+  per-deal values sum to `financial.unrealizedPnLUsd`, which previously was
+  the only place the figure existed, so a result with several open deals
+  could not show it per deal.
+
 ## [1.21.2] - 2026-10-25
 
 ### Fixed
