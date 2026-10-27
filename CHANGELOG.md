@@ -5,6 +5,20 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.22.2] - 2026-10-27
+
+### Fixed
+
+- **A hedge leg traded differently from the same DCA bot backtested on its
+  own.** The hedge backtest cut every leg's candles to the testing period, so
+  indicators on a higher timeframe started without their history and could
+  not open deals until they had warmed up inside the period. It also joined
+  each pair's candles one pair after another instead of in time order, so a
+  leg with more pairs than open-deal slots let every pair trade as if the
+  others had no deals. Each leg now gets the candles a standalone DCA
+  backtest loads (the indicator warm-up before the period, in time order
+  across pairs), and trading still starts at the period start.
+
 ## [1.22.1] - 2026-10-26
 
 ### Fixed

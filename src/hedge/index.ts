@@ -205,6 +205,43 @@ class HedgeBacktesting extends Backtesting {
     return Array.from(combinations.values())
   }
 
+  /**
+   * One leg's bars per interval, in the window a standalone DCA backtest of
+   * that leg loads: its indicator warm-up (`countBack` bars before the
+   * period start) through the period end, in time order across pairs.
+   * Trading still starts at the period start: `loadData(bars, startTime)`
+   * gates it, as in the DCA engine.
+   */
+  private legBars(
+    leg: ReturnType<typeof this.getOtherIntervals>['long'],
+    period: { from: number; to: number },
+    allDataMap: Map<string, { bar: FullBar[] }>,
+  ): { bar: FullBar[]; interval: ExchangeIntervals }[] {
+    const result: { bar: FullBar[]; interval: ExchangeIntervals }[] = []
+    for (const { interval, countBack } of leg.intervals) {
+      const from = period.from * 1000 - countBack * timeIntervalMap[interval]
+      const to = period.to * 1000
+      const intervalBars: FullBar[] = []
+      for (const symbol of leg.symbols.keys()) {
+        const data = allDataMap.get(`${interval}@${symbol}@${leg.exchange}`)
+        for (const bar of data?.bar ?? []) {
+          if (bar.time >= from && bar.time <= to) {
+            intervalBars.push(bar)
+          }
+        }
+      }
+      if (intervalBars.length > 0) {
+        intervalBars.sort((a, b) =>
+          a.time === b.time
+            ? `${a.symbol}`.localeCompare(`${b.symbol}`)
+            : a.time - b.time,
+        )
+        result.push({ bar: intervalBars, interval })
+      }
+    }
+    return result
+  }
+
   private setContext(id: string) {
     StrategyContextManager.setActiveContext(id)
   }
@@ -289,66 +326,8 @@ class HedgeBacktesting extends Backtesting {
       }
 
       // Step 4: Split bars into long and short arrays based on strategies
-
-      // Process long strategy data
-      for (const intervalInfo of strategiesInfo.long.intervals) {
-        const interval = intervalInfo.interval
-
-        // Get all bars for this interval and all symbols
-        let intervalBars: FullBar[] = []
-        for (const symbol of strategiesInfo.long.symbols.keys()) {
-          const key = `${interval}@${symbol}@${strategiesInfo.long.exchange}`
-          const data = allDataMap.get(key)
-          if (data) {
-            if (longPeriod) {
-              if (longPeriod.from >= data.from || longPeriod.to <= data.to) {
-                const filteredBars = data.bar.filter(
-                  (bar) =>
-                    bar.time >= longPeriod.from * 1000 &&
-                    bar.time <= longPeriod.to * 1000,
-                )
-                intervalBars = [...intervalBars, ...filteredBars]
-              } else {
-                intervalBars = [...intervalBars, ...data.bar]
-              }
-            }
-          }
-        }
-
-        if (intervalBars.length > 0) {
-          longBars.push({ bar: intervalBars, interval })
-        }
-      }
-
-      // Process short strategy data
-      for (const intervalInfo of strategiesInfo.short.intervals) {
-        const interval = intervalInfo.interval
-
-        // Get all bars for this interval and all symbols
-        let intervalBars: FullBar[] = []
-        for (const symbol of strategiesInfo.short.symbols.keys()) {
-          const key = `${interval}@${symbol}@${strategiesInfo.short.exchange}`
-          const data = allDataMap.get(key)
-          if (data) {
-            if (shortPeriod) {
-              if (shortPeriod.from > data.from || shortPeriod.to < data.to) {
-                const filteredBars = data.bar.filter(
-                  (bar) =>
-                    bar.time >= shortPeriod.from * 1000 &&
-                    bar.time <= shortPeriod.to * 1000,
-                )
-                intervalBars = [...intervalBars, ...filteredBars]
-              } else {
-                intervalBars = [...intervalBars, ...data.bar]
-              }
-            }
-          }
-        }
-
-        if (intervalBars.length > 0) {
-          shortBars.push({ bar: intervalBars, interval })
-        }
-      }
+      longBars = this.legBars(strategiesInfo.long, longPeriod, allDataMap)
+      shortBars = this.legBars(strategiesInfo.short, shortPeriod, allDataMap)
     } else {
       longBars = bars.long
       shortBars = bars.short
