@@ -38,6 +38,11 @@ import {
   OBFVGValueEnum,
   SessionRuleEnum,
   LWConditionEnum,
+  ADXModeEnum,
+  VWAPAnchorEnum,
+  VWAPLineEnum,
+  KDJLineEnum,
+  KDJCompareToEnum,
 } from '../../../types'
 
 import type {
@@ -65,6 +70,14 @@ import {
   sessionLevelsCondition,
   SmoothedResult,
   isInSession,
+  ADXResult,
+  dmiCondition,
+  KDJResult,
+  kdjCondition,
+  VWAPResult,
+  vwapCondition,
+  resolveVWAPAnchor,
+  trendFilterCondition,
 } from '@gainium/indicators'
 
 type Status = {
@@ -81,6 +94,45 @@ type Status = {
  */
 const isClockSession = (i: SettingsIndicators) =>
   i.type === IndicatorEnum.session && i.sessionRule !== SessionRuleEnum.levels
+
+/**
+ * The indicator config of the types and modes added in 1.24.0 (KDJ, VWAP,
+ * the MA trend filter, ADX DMI mode), applied over the config the build loop
+ * makes for the entry. Everything else — and an MA without the trend filter,
+ * an ADX without DMI mode — is returned untouched, so it builds as before.
+ */
+const withIndicatorModes = (
+  i: SettingsIndicators,
+  config: IndicatorConfigBackTesting,
+): IndicatorConfigBackTesting => {
+  if (i.type === IndicatorEnum.kdj) {
+    return {
+      type: IndicatorEnum.kdj,
+      kdjLength: +(i.kdjLength || 9),
+      kdjKSmooth: +(i.kdjKSmooth || 3),
+      kdjDSmooth: +(i.kdjDSmooth || 3),
+    }
+  }
+  if (i.type === IndicatorEnum.vwap) {
+    return {
+      type: IndicatorEnum.vwap,
+      vwapAnchor: resolveVWAPAnchor(i.vwapAnchor) as string as VWAPAnchorEnum,
+    }
+  }
+  if (config.type === IndicatorEnum.ma && i.trendFilter) {
+    return {
+      ...config,
+      trendFilter: i.trendFilter,
+      trendFilterLookback: i.trendFilterLookback,
+      trendFilterType: i.trendFilterType,
+      trendFilterValue: i.trendFilterValue,
+    }
+  }
+  if (config.type === IndicatorEnum.adx && i.adxMode === ADXModeEnum.dmi) {
+    return { ...config, dmi: true }
+  }
+  return config
+}
 
 export type Indicator = {
   instance: InternalIndicator
@@ -584,7 +636,9 @@ class TIStrategy extends Strategy implements StrategyInterface {
                                                                                 percentileLookback,
                                                                                 percentilePercentage,
                                                                               } as IndicatorConfigBackTesting)
-        const ind = new InternalIndicator(withSmoothing(i, indicatorConfig))
+        const ind = new InternalIndicator(
+          withSmoothing(i, withIndicatorModes(i, indicatorConfig)),
+        )
         Strategy.indicators.push({
           instance: ind,
           data: [],
@@ -1121,6 +1175,11 @@ class TIStrategy extends Strategy implements StrategyInterface {
             oteLeg,
             sessionLevelA,
             sessionLevelB,
+            adxMode,
+            vwapLine,
+            vwapBandMultiplier,
+            kdjLine,
+            kdjCompareTo,
           },
           data,
         } = i
@@ -1285,6 +1344,44 @@ class TIStrategy extends Strategy implements StrategyInterface {
             {
               level: +(oteLevel || 0.705),
               leg: oteLeg,
+              condition: indicatorCondition,
+            },
+          )
+        } else if (type === IndicatorEnum.vwap) {
+          // the close against the chosen line, within one anchor period
+          const [ld, pd] = [...data].sort((a, b) => b.time - a.time)
+          action = vwapCondition(
+            ld?.value as VWAPResult,
+            pd?.value as VWAPResult,
+            {
+              line: vwapLine ?? VWAPLineEnum.vwap,
+              bandMultiplier: vwapBandMultiplier ?? 1,
+              condition: indicatorCondition,
+            },
+          )
+        } else if (type === IndicatorEnum.kdj) {
+          // a line against another line or a level, with Stochastic's zone
+          const [ld, pd] = [...data].sort((a, b) => b.time - a.time)
+          action = kdjCondition(
+            ld?.value as KDJResult,
+            pd?.value as KDJResult,
+            {
+              line: kdjLine ?? KDJLineEnum.k,
+              compareTo: kdjCompareTo ?? KDJCompareToEnum.d,
+              level: indicatorValue,
+              condition: indicatorCondition,
+              zone: stochRange,
+              stochUpper,
+              stochLower,
+            },
+          )
+        } else if (type === IndicatorEnum.adx && adxMode === ADXModeEnum.dmi) {
+          // DMI mode: +DI against −DI; indicatorValue is not read
+          const [ld, pd] = [...data].sort((a, b) => b.time - a.time)
+          action = dmiCondition(
+            ld?.value as ADXResult,
+            pd?.value as ADXResult,
+            {
               condition: indicatorCondition,
             },
           )
@@ -1576,6 +1673,13 @@ class TIStrategy extends Strategy implements StrategyInterface {
           ) {
             last = lastData.value.ma
             prev = prevData.value.ma
+            if (trendFilter) {
+              // MA trend filter: the shared gate, ANDed with the condition
+              // below (see `if (trendFilter)` after the comparisons)
+              trendFilterAction = trendFilterCondition(lastData.value, {
+                trendFilterType,
+              })
+            }
             if (maCrossingValue === MAEnum.price) {
               value = lastData.value.price
               prevValue = prevData.value.price

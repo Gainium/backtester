@@ -13,6 +13,8 @@ import type {
   LongWickResult,
   OTEResult,
   SessionLevelsResult,
+  KDJResult,
+  VWAPResult,
 } from '@gainium/indicators'
 
 export const DirName = `../../tmp-backtester`
@@ -59,6 +61,43 @@ export enum IndicatorEnum {
   session = 'SESSION',
   lw = 'LW',
   ote = 'OTE',
+  kdj = 'KDJ',
+  vwap = 'VWAP',
+}
+
+/** VWAP: where the anchored VWAP restarts, in UTC (the indicators package's VWAPAnchorEnum). */
+export enum VWAPAnchorEnum {
+  day = 'day',
+  week = 'week',
+  month = 'month',
+}
+
+/** VWAP: the line the close is compared with (the indicators package's VWAPLineEnum). */
+export enum VWAPLineEnum {
+  vwap = 'vwap',
+  upper = 'upper',
+  lower = 'lower',
+}
+
+/** KDJ: a line a condition reads (the indicators package's KDJLineEnum). */
+export enum KDJLineEnum {
+  k = 'k',
+  d = 'd',
+  j = 'j',
+}
+
+/** KDJ: what the chosen line is compared with — another line, or the fixed level. */
+export enum KDJCompareToEnum {
+  k = 'k',
+  d = 'd',
+  j = 'j',
+  custom = 'custom',
+}
+
+/** ADX: what the condition reads — the ADX line (default) or +DI vs −DI. */
+export enum ADXModeEnum {
+  adx = 'adx',
+  dmi = 'dmi',
 }
 
 export enum SessionRuleEnum {
@@ -235,6 +274,8 @@ export type MAResult = {
   ma: number
   maType: string
   price: number
+  /** trend filter on only: MAR's trend code of the MA (see MATrendResult) */
+  trend?: number
 }
 
 export type Percentile = {
@@ -273,6 +314,17 @@ export enum RangeType {
 
 export type IndicatorConfigBackTesting =
   | { type: IndicatorEnum.lw; lwThreshold: number; lwMaxDuration: number }
+  | {
+      type: IndicatorEnum.kdj
+      kdjLength: number
+      kdjKSmooth: number
+      kdjDSmooth: number
+    }
+  | {
+      // the band multiplier is a condition setting, not part of the instance
+      type: IndicatorEnum.vwap
+      vwapAnchor: VWAPAnchorEnum
+    }
   | { type: IndicatorEnum.ote; oteLeftBars: number; oteMinLegSize: number }
   | {
       type: IndicatorEnum.session
@@ -355,6 +407,8 @@ export type IndicatorConfigBackTesting =
         | IndicatorEnum.atr
         | IndicatorEnum.adr
       interval: number
+      /** ADX only: DMI mode, the result also carries +DI / −DI */
+      dmi?: boolean
     } & Percentile &
       Smoothing)
   | ({
@@ -373,11 +427,11 @@ export type IndicatorConfigBackTesting =
       maSource?: MAEnum
       maSignal?: MAEnum
     } & Percentile)
-  | {
+  | ({
       type: IndicatorEnum.ma
       maType: MAEnum
       interval: number
-    }
+    } & TrendFilter)
   | {
       type: IndicatorEnum.stoch
       length: number
@@ -438,6 +492,9 @@ type PercentileResult = {
   percentile?: number
   value: number
   trend?: number
+  /** ADX in DMI mode only: +DI / −DI */
+  pdi?: number
+  mdi?: number
 }
 
 export type IndicatorHistory = { time: number } & (
@@ -502,6 +559,8 @@ export type IndicatorHistory = { time: number } & (
   | { type: IndicatorEnum.dc; value: DCResult }
   | { type: IndicatorEnum.lw; value: LongWickResult }
   | { type: IndicatorEnum.ote; value: OTEResult }
+  | { type: IndicatorEnum.kdj; value: KDJResult }
+  | { type: IndicatorEnum.vwap; value: VWAPResult }
   /** in / out: the clock filter's status; levels: the SessionLevels result */
   | { type: IndicatorEnum.session; value: boolean | SessionLevelsResult }
 )
@@ -658,6 +717,31 @@ export type SettingsIndicators = {
   /** OTE Levels: retracement level price is compared with (0 = leg end, 1 = origin). */
   oteLevel?: string
   oteLeg?: OTELegEnum
+  /** VWAP: anchor, missing = day. */
+  vwapAnchor?: VWAPAnchorEnum
+  /** VWAP: line the close is compared with, missing = vwap. */
+  vwapLine?: VWAPLineEnum
+  /** VWAP: band width in standard deviations, missing = 1 (condition only). */
+  vwapBandMultiplier?: number
+  /**
+   * ADX: missing / 'adx' = the ADX line as before; 'dmi' = indicatorCondition
+   * reads +DI against −DI and indicatorValue is ignored.
+   */
+  adxMode?: ADXModeEnum
+  /** KDJ: RSV window, missing = 9. */
+  kdjLength?: number
+  /** KDJ: K smoothing, missing = 3. */
+  kdjKSmooth?: number
+  /** KDJ: D smoothing, missing = 3. */
+  kdjDSmooth?: number
+  /** KDJ: line the condition reads, missing = k. */
+  kdjLine?: KDJLineEnum
+  /**
+   * KDJ: what that line is compared with, missing = d; 'custom' = the fixed
+   * level indicatorValue. The zone filter is stochRange / stochUpper /
+   * stochLower, read as the Stochastic condition reads them.
+   */
+  kdjCompareTo?: KDJCompareToEnum
 }
 
 export enum LWConditionEnum {

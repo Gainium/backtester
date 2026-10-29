@@ -45,6 +45,11 @@ import {
   LongWick,
   OTELevels,
   SessionLevels,
+  KDJ,
+  VWAP,
+  VWAP_WARMUP,
+  resolveVWAPAnchor,
+  MATrendFilter,
   SmoothedIndicator,
   getSmoothingWarmup,
   isSmoothableIndicator,
@@ -107,6 +112,9 @@ export default class InternalIndicator {
     | LongWick
     | OTELevels
     | SessionLevels
+    | KDJ
+    | VWAP
+    | MATrendFilter
     | SmoothedIndicator
   private data: IndicatorHistory[] = []
 
@@ -362,6 +370,8 @@ export default class InternalIndicator {
         indicatorConfig.percentile,
         indicatorConfig.percentileLookback,
         indicatorConfig.percentilePercentage,
+        // DMI mode adds +DI / −DI to the result; the ADX line is unchanged
+        indicatorConfig.dmi === true,
       )
       this.length =
         indicatorConfig.interval * 2 +
@@ -534,6 +544,22 @@ export default class InternalIndicator {
         this.indicator = new McGinley(indicatorConfig.interval)
         this.length = indicatorConfig.interval + 300
       }
+      // Trend filter: the MA against itself `trendFilterLookback` bars back.
+      // The wrapper reports the plain MA bit for bit as `value`; without the
+      // filter the plain MA and its warm-up stay exactly as they were.
+      if (indicatorConfig.trendFilter && this.indicator) {
+        this.indicator = new MATrendFilter(
+          this.indicator as ConstructorParameters<typeof MATrendFilter>[0],
+          indicatorConfig.trendFilterLookback,
+          indicatorConfig.trendFilterValue,
+          indicatorConfig.trendFilterType,
+        )
+        // as the indicators package's warm-up for the filter
+        this.length += Math.max(
+          0,
+          Math.floor(+(indicatorConfig.trendFilterLookback ?? 0)) || 0,
+        )
+      }
     }
     if (indicatorConfig.type === IndicatorEnum.tv) {
       this.indicator = new TVTA(
@@ -612,6 +638,23 @@ export default class InternalIndicator {
       })
       this.length = 1500
     }
+    if (indicatorConfig.type === IndicatorEnum.kdj) {
+      const kdj = new KDJ(
+        indicatorConfig.kdjLength,
+        indicatorConfig.kdjKSmooth,
+        indicatorConfig.kdjDSmooth,
+      )
+      this.indicator = kdj
+      // the indicators package's warm-up: n − 1 + kdjSettleBars(k, d)
+      this.length = kdj.warmup + add
+    }
+    if (indicatorConfig.type === IndicatorEnum.vwap) {
+      // the band multiplier is applied by vwapCondition, not by the instance
+      this.indicator = new VWAP(indicatorConfig.vwapAnchor)
+      // the indicators package's warm-up per anchor: one whole period plus a
+      // candle on the smallest interval the anchor is normally used with
+      this.length = VWAP_WARMUP[resolveVWAPAnchor(indicatorConfig.vwapAnchor)]
+    }
     if (smoothingConfig && this.indicator) {
       this.indicator = new SmoothedIndicator(
         this.indicator as ConstructorParameters<typeof SmoothedIndicator>[0],
@@ -677,7 +720,8 @@ export default class InternalIndicator {
         kind instanceof ATR ||
         kind instanceof ADR ||
         kind instanceof PriorPivot ||
-        kind instanceof ATH)
+        kind instanceof ATH ||
+        kind instanceof KDJ)
     ) {
       target.next({
         high: +value.h,
@@ -698,7 +742,8 @@ export default class InternalIndicator {
         kind instanceof BBPB ||
         kind instanceof BollingerBands ||
         kind instanceof DIV ||
-        kind instanceof PC)
+        kind instanceof PC ||
+        kind instanceof MATrendFilter)
     ) {
       target.next({
         high: +value.h,
@@ -734,6 +779,17 @@ export default class InternalIndicator {
         time,
       })
     }
+    // anchored to the period that contains the candle's open time
+    if (this.indicator && kind instanceof VWAP) {
+      target.next({
+        high: +value.h,
+        low: +value.l,
+        close: +value.c,
+        open: +value.o,
+        volume: +value.v,
+        time,
+      })
+    }
     if (this.indicator && kind instanceof AO) {
       target.next({
         high: +value.h,
@@ -761,11 +817,18 @@ export default class InternalIndicator {
                       result,
                       price: value.c,
                     }
-                : {
-                    ma: result as unknown as number,
-                    price: value.c,
-                    maType: this.indicatorName,
-                  },
+                : kind instanceof MATrendFilter
+                  ? {
+                      ma: (result as unknown as { value: number }).value,
+                      price: value.c,
+                      maType: this.indicatorName,
+                      trend: (result as unknown as { trend?: number }).trend,
+                    }
+                  : {
+                      ma: result as unknown as number,
+                      price: value.c,
+                      maType: this.indicatorName,
+                    },
           // eslint-disable-next-line @typescript-eslint/ban-ts-comment
           // @ts-ignore
           type: this.type,

@@ -5,6 +5,46 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.24.0] - 2026-10-29
+
+### Added
+
+- **VWAP (`IndicatorEnum.vwap = 'VWAP'`).** The anchored VWAP of the
+  indicators package, restarting every day (default), Monday or 1st of the
+  month in UTC (`vwapAnchor`), fed each candle's open time and volume. The
+  condition (`indicatorCondition` `cu` / `cd` / `gt` / `lt`) compares the
+  close with the VWAP or a standard-deviation band (`vwapLine`
+  `vwap` / `upper` / `lower`, `vwapBandMultiplier`, default 1) through the
+  package's `vwapCondition`; a crossing counts only within one anchor period.
+  The band multiplier is a condition setting only. Warm-up = the package's
+  per-anchor window (day 1441, week 2017, month 2977 candles).
+- **KDJ (`IndicatorEnum.kdj = 'KDJ'`).** `kdjLength` / `kdjKSmooth` /
+  `kdjDSmooth` (default 9 / 3 / 3). The condition reads a line (`kdjLine`
+  K / D / J, default K) against another line or a fixed level
+  (`kdjCompareTo`, default D; `custom` = `indicatorValue`), with Stochastic's
+  zone filter (`stochRange`, `stochUpper`, `stochLower`, read as Stochastic
+  reads them), through the package's `kdjCondition`. Warm-up = the package's
+  (63 candles for 9 / 3 / 3).
+- **DMI mode on ADX (`adxMode: 'dmi'`).** The ADX is built with its +DI / −DI
+  lines and `indicatorCondition` reads +DI against −DI (`cu` +DI crosses above
+  −DI, `cd` below, `gt` / `lt` above / below) through the package's
+  `dmiCondition`; `indicatorValue` is not read. Smoothing and percentile do not
+  affect the DI lines.
+- **Trend filter on the Moving Average.** MAR's `trendFilter`,
+  `trendFilterLookback`, `trendFilterType`, `trendFilterValue` now work on a
+  Moving Average of any type: the MA is built as the package's
+  `MATrendFilter`, its own condition is evaluated on the plain MA value exactly
+  as before, and ANDed with the package's `trendFilterCondition`. Warm-up adds
+  the lookback.
+
+### Changed
+
+- `@gainium/indicators` 1.10.0 → 1.11.0.
+- An MA entry stored with `trendFilter: true` used to never fire (no trend was
+  ever computed for it); it now applies the filter. Without `trendFilter`, and
+  an ADX without `adxMode: 'dmi'`, backtest exactly as before (pinned by golden
+  results from 1.23.0).
+
 ## [1.23.0] - 2026-10-29
 
 ### Added
