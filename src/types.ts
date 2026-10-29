@@ -136,6 +136,17 @@ export enum SessionLevelsActiveEnum {
   always = 'always',
 }
 
+/**
+ * Price Change: how the candle's move is compared with pcValue (and pcValue2)
+ * — missing = gt, the behaviour before this setting (the indicators package's
+ * PCCompareEnum).
+ */
+export enum PCCompareEnum {
+  gt = 'gt',
+  lt = 'lt',
+  bw = 'bw',
+}
+
 /** VWAP: where the anchored VWAP restarts, in UTC (the indicators package's VWAPAnchorEnum). */
 export enum VWAPAnchorEnum {
   day = 'day',
@@ -756,6 +767,13 @@ export type SettingsIndicators = {
   pcDown?: string
   pcCondition?: PCConditionEnum
   pcValue?: string
+  /**
+   * Price Change: greater than (missing = as before) / lower than / between
+   * |pcValue| (and |pcValue2| for bw).
+   */
+  pcCompare?: PCCompareEnum
+  /** Price Change: the second bound for bw, same sign as pcValue. */
+  pcValue2?: string
   ppHighLeft?: number
   ppHighRight?: number
   ppLowLeft?: number

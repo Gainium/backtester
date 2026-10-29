@@ -5,6 +5,23 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.26.0] - 2026-10-29
+
+### Added
+
+- **Price Change range.** `pcCompare` (`PCCompareEnum` `gt` | `lt` | `bw`)
+  and `pcValue2` on Price Change: the latest candle's move (open→high for a
+  positive `pcValue`, open→low otherwise) greater than / lower than |pcValue|,
+  or strictly between |pcValue| and |pcValue2| (same sign, order-free),
+  through the indicators package's `priceChangeCondition`. A missing / null
+  `pcCompare` is `gt` and backtests exactly as before (golden
+  `test/fixtures/indicator-modes-off-1.26/`, generated from 1.25.0). The PC
+  instance config (`pcUp` / `pcDown`) is unchanged.
+
+### Changed
+
+- `@gainium/indicators` → 1.13.0.
+
 ## [1.25.0] - 2026-10-29
 
 ### Added

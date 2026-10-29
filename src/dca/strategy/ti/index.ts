@@ -27,7 +27,6 @@ import {
   StartConditionEnum,
   CloseConditionEnum,
   BotStartTypeEnum,
-  PCConditionEnum,
   ppValueEnum,
   ppValueTypeEnum,
   ScaleDcaTypeEnum,
@@ -60,6 +59,7 @@ import {
   DIVResult,
   OBFVGResult,
   PCResult,
+  priceChangeCondition,
   PercentileResult,
   PriorPivotResult,
   QFLResult,
@@ -1218,6 +1218,8 @@ class TIStrategy extends Strategy implements StrategyInterface {
             trendFilterType,
             stCondition,
             pcValue,
+            pcValue2,
+            pcCompare,
             ppValue,
             ppType,
             indicatorAction,
@@ -1394,12 +1396,11 @@ class TIStrategy extends Strategy implements StrategyInterface {
                     : false
         } else if (type === IndicatorEnum.pc) {
           const [last] = [...data].sort((a, b) => b.time - a.time)
-          const pcCondition =
-            +(pcValue ?? '5') > 0 ? PCConditionEnum.up : PCConditionEnum.down
-          action =
-            (pcCondition === PCConditionEnum.down &&
-              (last.value as PCResult).down) ||
-            (pcCondition === PCConditionEnum.up && (last.value as PCResult).up)
+          action = priceChangeCondition(last?.value as PCResult, {
+            value: pcValue,
+            value2: pcValue2,
+            compare: pcCompare,
+          })
         } else if (type === IndicatorEnum.ote) {
           const [ld, pd] = [...data].sort((a, b) => b.time - a.time)
           action = oteCondition(
