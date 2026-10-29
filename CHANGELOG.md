@@ -5,6 +5,18 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.27.0] - 2026-10-29
+
+### Changed
+
+- **`@gainium/indicators` 1.14.0.** Session Price levels with
+  `sessionLevelsActive` `outside` / `always`: a crossing of the price with a
+  previous-session level now also fires on the first candle after the session
+  (e.g. a Monday range broken on Tuesday 00:00 opens its deal on Tuesday
+  01:00); `session` / missing backtests exactly as before. Squeeze Momentum:
+  a missing `sqzBBMult` is now 1.5 (was 2), matching the chart TradingView
+  displays; a stored `sqzBBMult` is unchanged.
+
 ## [1.26.0] - 2026-10-29
 
 ### Added

@@ -46,7 +46,7 @@ type Settings = {
 const series = (s: Settings) => {
   const ind = new Squeeze(
     s.sqzLength ?? 20,
-    s.sqzBBMult ?? 2,
+    s.sqzBBMult ?? 1.5,
     s.sqzKCLength ?? 20,
     s.sqzKCMult ?? 1.5,
   )
@@ -62,10 +62,10 @@ const cases: [
   SqzMomentumEnum | undefined,
   Settings,
 ][] = [
-  // all missing: fired + positive, 20 × 2 / 20 × 1.5
+  // all missing: fired + positive, 20 × 1.5 / 20 × 1.5 (BB 1.5 since indicators 1.14.0)
   [undefined, undefined, {}],
   [fired, negative, {}],
-  [fired, SqzMomentumEnum.any, { sqzBBMult: 1.5 }],
+  [fired, SqzMomentumEnum.any, { sqzBBMult: 2 }],
   [on, rising, { sqzLength: 14, sqzKCLength: 14 }],
   [off, falling, {}],
   [any, crossUp, { sqzKCMult: 1.25 }],
@@ -130,6 +130,24 @@ describe('Squeeze Momentum start condition', () => {
         JSON.stringify(s),
       ).to.not.deep.equal(plain)
     }
+  })
+
+  it('a missing BB multiplier is 1.5 (not 2)', async () => {
+    const entry = (settings: Settings) =>
+      startEntry({
+        type: IndicatorEnum.sqz,
+        sqzSignal: on,
+        sqzMomentum: SqzMomentumEnum.any,
+        ...settings,
+      })
+    const missing = await startBars(entry({}), bars)
+    expect(missing.length).to.be.greaterThan(3)
+    expect(missing).to.deep.equal(
+      await startBars(entry({ sqzBBMult: 1.5 }), bars),
+    )
+    expect(missing).to.not.deep.equal(
+      await startBars(entry({ sqzBBMult: 2 }), bars),
+    )
   })
 
   it('any + any never fires', async () => {
