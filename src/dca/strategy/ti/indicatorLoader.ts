@@ -50,6 +50,12 @@ import {
   VWAP_WARMUP,
   resolveVWAPAnchor,
   MATrendFilter,
+  Candle,
+  CANDLE_WARMUP,
+  OrderBlocks,
+  OB_WARMUP,
+  Squeeze,
+  squeezeWarmup,
   SmoothedIndicator,
   getSmoothingWarmup,
   isSmoothableIndicator,
@@ -115,6 +121,9 @@ export default class InternalIndicator {
     | KDJ
     | VWAP
     | MATrendFilter
+    | Candle
+    | OrderBlocks
+    | Squeeze
     | SmoothedIndicator
   private data: IndicatorHistory[] = []
 
@@ -655,6 +664,28 @@ export default class InternalIndicator {
       // candle on the smallest interval the anchor is normally used with
       this.length = VWAP_WARMUP[resolveVWAPAnchor(indicatorConfig.vwapAnchor)]
     }
+    if (indicatorConfig.type === IndicatorEnum.candle) {
+      this.indicator = new Candle(indicatorConfig.source)
+      // the indicators package's warm-up: the Heikin Ashi settle (30) plus
+      // 51 counted candles, so a streak of up to 50 is never counted short
+      this.length = CANDLE_WARMUP
+    }
+    if (indicatorConfig.type === IndicatorEnum.ob) {
+      this.indicator = new OrderBlocks(indicatorConfig.swingLength)
+      // the indicators package's warm-up (the 500-bar search window + swings)
+      this.length = OB_WARMUP
+    }
+    if (indicatorConfig.type === IndicatorEnum.sqz) {
+      const sqz = new Squeeze(
+        indicatorConfig.length,
+        indicatorConfig.bbMult,
+        indicatorConfig.kcLength,
+        indicatorConfig.kcMult,
+      )
+      this.indicator = sqz
+      // the indicators package's warm-up: 2 × max(length, kcLength)
+      this.length = squeezeWarmup(sqz.length, sqz.kcLength)
+    }
     if (smoothingConfig && this.indicator) {
       this.indicator = new SmoothedIndicator(
         this.indicator as ConstructorParameters<typeof SmoothedIndicator>[0],
@@ -721,7 +752,8 @@ export default class InternalIndicator {
         kind instanceof ADR ||
         kind instanceof PriorPivot ||
         kind instanceof ATH ||
-        kind instanceof KDJ)
+        kind instanceof KDJ ||
+        kind instanceof Squeeze)
     ) {
       target.next({
         high: +value.h,
@@ -760,7 +792,8 @@ export default class InternalIndicator {
         kind instanceof DonchianChannels ||
         kind instanceof OBFVG ||
         kind instanceof LongWick ||
-        kind instanceof OTELevels)
+        kind instanceof OTELevels ||
+        kind instanceof Candle)
     ) {
       target.next({
         high: +value.h,
@@ -769,8 +802,12 @@ export default class InternalIndicator {
         open: +value.o,
       })
     }
-    // grouped into sessions by the candle's open time
-    if (this.indicator && kind instanceof SessionLevels) {
+    // grouped into sessions by the candle's open time; Order Blocks take it
+    // as the block id (the indicators package's feedCandle passes `t` too)
+    if (
+      this.indicator &&
+      (kind instanceof SessionLevels || kind instanceof OrderBlocks)
+    ) {
       target.next({
         high: +value.h,
         low: +value.l,

@@ -15,6 +15,9 @@ import type {
   SessionLevelsResult,
   KDJResult,
   VWAPResult,
+  CandleResult,
+  OrderBlockResult,
+  SqueezeResult,
 } from '@gainium/indicators'
 
 export const DirName = `../../tmp-backtester`
@@ -63,6 +66,74 @@ export enum IndicatorEnum {
   ote = 'OTE',
   kdj = 'KDJ',
   vwap = 'VWAP',
+  candle = 'CANDLE',
+  ob = 'OB',
+  sqz = 'SQZ',
+}
+
+/** Candle colour: which candle the colour is read from (the indicators package's CandleSourceEnum). */
+export enum CandleSourceEnum {
+  regular = 'regular',
+  heikinAshi = 'heikinAshi',
+}
+
+/** Candle colour: the colour required (the indicators package's CandleColorEnum). */
+export enum CandleColorEnum {
+  green = 'green',
+  red = 'red',
+}
+
+/**
+ * Candle colour: `streak` = while the last N candles are all that colour,
+ * `start` = only on the N-th candle of the run (the indicators package's
+ * CandleTriggerEnum).
+ */
+export enum CandleTriggerEnum {
+  streak = 'streak',
+  start = 'start',
+}
+
+/** Order Blocks: which block the close is compared with (the indicators package's OBSideEnum). */
+export enum OBSideEnum {
+  bullish = 'bullish',
+  bearish = 'bearish',
+}
+
+/** Order Blocks: the level of that block; middle = (top + bottom) / 2 (OBLevelEnum). */
+export enum OBLevelEnum {
+  top = 'top',
+  middle = 'middle',
+  bottom = 'bottom',
+}
+
+/** Squeeze Momentum: the squeeze state required (the indicators package's SqzSignalEnum). */
+export enum SqzSignalEnum {
+  fired = 'fired',
+  on = 'on',
+  off = 'off',
+  any = 'any',
+}
+
+/** Squeeze Momentum: the momentum requirement (the indicators package's SqzMomentumEnum). */
+export enum SqzMomentumEnum {
+  positive = 'positive',
+  negative = 'negative',
+  rising = 'rising',
+  falling = 'falling',
+  crossUp = 'crossUp',
+  crossDown = 'crossDown',
+  any = 'any',
+}
+
+/**
+ * Session Price levels: where the condition is evaluated — inside the
+ * session (missing = the behaviour before this setting), outside it, or both
+ * (the indicators package's SessionLevelsActiveEnum).
+ */
+export enum SessionLevelsActiveEnum {
+  session = 'session',
+  outside = 'outside',
+  always = 'always',
 }
 
 /** VWAP: where the anchored VWAP restarts, in UTC (the indicators package's VWAPAnchorEnum). */
@@ -326,6 +397,15 @@ export type IndicatorConfigBackTesting =
       vwapAnchor: VWAPAnchorEnum
     }
   | { type: IndicatorEnum.ote; oteLeftBars: number; oteMinLegSize: number }
+  | { type: IndicatorEnum.candle; source: CandleSourceEnum }
+  | { type: IndicatorEnum.ob; swingLength: number }
+  | {
+      type: IndicatorEnum.sqz
+      length: number
+      bbMult: number
+      kcLength: number
+      kcMult: number
+    }
   | {
       type: IndicatorEnum.session
       sessionRule: SessionRuleEnum.levels
@@ -561,6 +641,9 @@ export type IndicatorHistory = { time: number } & (
   | { type: IndicatorEnum.ote; value: OTEResult }
   | { type: IndicatorEnum.kdj; value: KDJResult }
   | { type: IndicatorEnum.vwap; value: VWAPResult }
+  | { type: IndicatorEnum.candle; value: CandleResult }
+  | { type: IndicatorEnum.ob; value: OrderBlockResult }
+  | { type: IndicatorEnum.sqz; value: SqueezeResult }
   /** in / out: the clock filter's status; levels: the SessionLevels result */
   | { type: IndicatorEnum.session; value: boolean | SessionLevelsResult }
 )
@@ -742,6 +825,46 @@ export type SettingsIndicators = {
    * stochLower, read as the Stochastic condition reads them.
    */
   kdjCompareTo?: KDJCompareToEnum
+  /** Candle colour: candle the colour is read from, missing = heikinAshi. */
+  candleSource?: CandleSourceEnum
+  /** Candle colour: colour required, missing = green. */
+  candleColor?: CandleColorEnum
+  /** Candle colour: N candles in a row (1..50), missing = 1. */
+  candleCount?: number
+  /** Candle colour: streak (while) or start (the N-th candle only), missing = streak. */
+  candleTrigger?: CandleTriggerEnum
+  /** Order Blocks: pivot bars on each side of a swing (2..50), missing = 5. */
+  obSwingLength?: number
+  /** Order Blocks: block the close is compared with, missing = bullish. */
+  obSide?: OBSideEnum
+  /** Order Blocks: level of that block, missing = top. */
+  obLevel?: OBLevelEnum
+  /** Squeeze Momentum: BB length, missing = 20. */
+  sqzLength?: number
+  /** Squeeze Momentum: BB multiplier (decimals), missing = 2. */
+  sqzBBMult?: number
+  /** Squeeze Momentum: KC length (also the momentum length), missing = 20. */
+  sqzKCLength?: number
+  /** Squeeze Momentum: KC multiplier (decimals), missing = 1.5. */
+  sqzKCMult?: number
+  /** Squeeze Momentum: squeeze state required, missing = fired. */
+  sqzSignal?: SqzSignalEnum
+  /** Squeeze Momentum: momentum requirement, missing = positive. */
+  sqzMomentum?: SqzMomentumEnum
+  /** Divergence: pivot bars to the left (1..50); missing = 3, as before. */
+  divPivotLeft?: number
+  /** Divergence: pivot bars to the right (1..50); missing = 1, as before. */
+  divPivotRight?: number
+  /** Divergence: fewest bars between pivots (1..500); missing = 1, as before. */
+  divRangeLower?: number
+  /** Divergence: most bars between pivots (2..500); missing = 60, as before. */
+  divRangeUpper?: number
+  /**
+   * Session Price levels: where the condition is evaluated — missing /
+   * 'session' only inside the session (as before), 'outside' only outside it,
+   * 'always' on every candle.
+   */
+  sessionLevelsActive?: SessionLevelsActiveEnum
 }
 
 export enum LWConditionEnum {

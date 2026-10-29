@@ -43,6 +43,7 @@ import {
   VWAPLineEnum,
   KDJLineEnum,
   KDJCompareToEnum,
+  CandleSourceEnum,
 } from '../../../types'
 
 import type {
@@ -78,6 +79,15 @@ import {
   vwapCondition,
   resolveVWAPAnchor,
   trendFilterCondition,
+  CandleResult,
+  candleCondition,
+  resolveCandleSource,
+  OrderBlockResult,
+  orderBlockCondition,
+  resolveOBSwingLength,
+  SqueezeResult,
+  squeezeCondition,
+  resolveSqueezeSettings,
 } from '@gainium/indicators'
 
 type Status = {
@@ -95,16 +105,62 @@ type Status = {
 const isClockSession = (i: SettingsIndicators) =>
   i.type === IndicatorEnum.session && i.sessionRule !== SessionRuleEnum.levels
 
+/** A stored optional number: missing / null / '' is unset (undefined). */
+const setNumber = (v: number | string | null | undefined) =>
+  v === undefined || v === null || v === '' ? undefined : +v
+
 /**
- * The indicator config of the types and modes added in 1.24.0 (KDJ, VWAP,
- * the MA trend filter, ADX DMI mode), applied over the config the build loop
- * makes for the entry. Everything else — and an MA without the trend filter,
- * an ADX without DMI mode — is returned untouched, so it builds as before.
+ * The indicator config of the types and modes added in 1.24.0 / 1.25.0
+ * (KDJ, VWAP, the MA trend filter, ADX DMI mode, Candle colour, Order
+ * Blocks, Squeeze Momentum, Divergence pivots), applied over the config the
+ * build loop makes for the entry. Everything else — and an MA without the
+ * trend filter, an ADX without DMI mode, a Divergence without pivot fields —
+ * is returned untouched, so it builds as before.
  */
 const withIndicatorModes = (
   i: SettingsIndicators,
   config: IndicatorConfigBackTesting,
 ): IndicatorConfigBackTesting => {
+  // math only, defaulted as the indicators package's factory does; the
+  // colour / count / trigger, side / level and signal / momentum are
+  // condition settings
+  if (i.type === IndicatorEnum.candle) {
+    return {
+      type: IndicatorEnum.candle,
+      source: resolveCandleSource(i.candleSource) as string as CandleSourceEnum,
+    }
+  }
+  if (i.type === IndicatorEnum.ob) {
+    return {
+      type: IndicatorEnum.ob,
+      swingLength: resolveOBSwingLength(i.obSwingLength),
+    }
+  }
+  if (i.type === IndicatorEnum.sqz) {
+    return {
+      type: IndicatorEnum.sqz,
+      ...resolveSqueezeSettings(
+        i.sqzLength,
+        i.sqzBBMult,
+        i.sqzKCLength,
+        i.sqzKCMult,
+      ),
+    }
+  }
+  if (config.type === IndicatorEnum.div) {
+    // a pivot / range field reaches the DIV only when it is set, so an entry
+    // without them builds (and warms up) exactly as before
+    const fields = {
+      leftBars: setNumber(i.divPivotLeft),
+      rightBars: setNumber(i.divPivotRight),
+      rangeLower: setNumber(i.divRangeLower),
+      rangeUpper: setNumber(i.divRangeUpper),
+    }
+    const set = Object.fromEntries(
+      Object.entries(fields).filter(([, v]) => v !== undefined),
+    )
+    return Object.keys(set).length ? { ...config, ...set } : config
+  }
   if (i.type === IndicatorEnum.kdj) {
     return {
       type: IndicatorEnum.kdj,
@@ -1180,6 +1236,14 @@ class TIStrategy extends Strategy implements StrategyInterface {
             vwapBandMultiplier,
             kdjLine,
             kdjCompareTo,
+            candleColor,
+            candleCount,
+            candleTrigger,
+            obSide,
+            obLevel,
+            sqzSignal,
+            sqzMomentum,
+            sessionLevelsActive,
           },
           data,
         } = i
@@ -1395,6 +1459,44 @@ class TIStrategy extends Strategy implements StrategyInterface {
               a: sessionLevelA,
               b: sessionLevelB,
               condition: indicatorCondition,
+              // missing = only inside the session, as before
+              active: sessionLevelsActive,
+            },
+          )
+        } else if (type === IndicatorEnum.candle) {
+          // the newest candle's colour and run; indicatorCondition is not read
+          const [ld, pd] = [...data].sort((a, b) => b.time - a.time)
+          action = candleCondition(
+            ld?.value as CandleResult,
+            pd?.value as CandleResult,
+            {
+              color: candleColor,
+              count: candleCount,
+              trigger: candleTrigger,
+            },
+          )
+        } else if (type === IndicatorEnum.ob) {
+          // the close against a level of the latest active block of one side;
+          // a crossing needs the same block on both bars
+          const [ld, pd] = [...data].sort((a, b) => b.time - a.time)
+          action = orderBlockCondition(
+            ld?.value as OrderBlockResult,
+            pd?.value as OrderBlockResult,
+            {
+              side: obSide,
+              level: obLevel,
+              condition: indicatorCondition,
+            },
+          )
+        } else if (type === IndicatorEnum.sqz) {
+          // squeeze state AND momentum; indicatorCondition is not read
+          const [ld, pd] = [...data].sort((a, b) => b.time - a.time)
+          action = squeezeCondition(
+            ld?.value as SqueezeResult,
+            pd?.value as SqueezeResult,
+            {
+              signal: sqzSignal,
+              momentum: sqzMomentum,
             },
           )
         } else if (type === IndicatorEnum.lw) {

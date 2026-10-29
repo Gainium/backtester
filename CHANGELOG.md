@@ -5,6 +5,51 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.25.0] - 2026-10-29
+
+### Added
+
+- **Candle colour (`IndicatorEnum.candle = 'CANDLE'`).** The colour of the
+  regular candle or its Heikin Ashi transform (`candleSource`, default
+  `heikinAshi`), N candles in a row (`candleColor` green / red, default green;
+  `candleCount`, default 1; `candleTrigger` `streak` while the run lasts, or
+  `start` on its N-th candle only), through the indicators package's
+  `candleCondition`. A doji breaks every run and never fires. Warm-up = the
+  package's `CANDLE_WARMUP` (81 candles).
+- **Order Blocks (`IndicatorEnum.ob = 'OB'`).** The latest unmitigated
+  bullish / bearish order block (`obSwingLength` pivot bars each side,
+  default 5), fed each candle's open time as the block id. The close against
+  a level of one side's block (`obSide` bullish / bearish, `obLevel` top /
+  middle / bottom; `indicatorCondition` `cu` / `cd` / `gt` / `lt`) through
+  the package's `orderBlockCondition`; a crossing needs the same block on
+  both bars. Warm-up = the package's `OB_WARMUP` (1000 candles).
+- **Squeeze Momentum (`IndicatorEnum.sqz = 'SQZ'`).** `sqzLength` /
+  `sqzBBMult` / `sqzKCLength` / `sqzKCMult` (default 20 / 2 / 20 / 1.5,
+  multipliers in decimals); the squeeze state (`sqzSignal` fired / on / off
+  / any) AND the momentum (`sqzMomentum` positive / negative / rising /
+  falling / crossUp / crossDown / any) through the package's
+  `squeezeCondition`. Warm-up = the package's `squeezeWarmup`
+  (2 × max(length, kcLength)).
+- **Divergence pivots.** `divPivotLeft`, `divPivotRight`, `divRangeLower`,
+  `divRangeUpper` reach the Divergence indicator's pivot and range settings.
+  Missing (or null / empty), the indicator is built exactly as before
+  (3 / 1 / 1 / 60).
+- **Session Price levels outside the session.** `sessionLevelsActive`
+  (`session` / `outside` / `always`) is passed to the package's
+  `sessionLevelsCondition`: with `outside` or `always` the condition is also
+  evaluated on candles outside the session, against the last completed
+  session (e.g. a Monday range traded on the other days). Missing = only
+  inside the session, as before.
+
+### Changed
+
+- `@gainium/indicators` 1.11.0 → 1.12.0.
+- Divergence without the pivot fields, Session Price levels without
+  `sessionLevelsActive`, and OBFVG / Bollinger Bands / SuperTrend backtest
+  exactly as in 1.24.0 (pinned by golden results generated from 1.24.0).
+  Decimal Bollinger multipliers (`bbwMult`) and SuperTrend `factor` reach
+  the math unrounded (2.5 backtests differently from both 2 and 3).
+
 ## [1.24.0] - 2026-10-29
 
 ### Added
