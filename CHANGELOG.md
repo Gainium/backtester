@@ -5,6 +5,22 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.23.0] - 2026-10-29
+
+### Added
+
+- **McGinley Dynamic as a Moving Average type (`MAEnum.mcginley`).** A
+  Moving Average condition with `maType: mcginley` builds the indicators
+  package's `McGinley` line, with the same warm-up as EMA, and trades on it
+  like any other MA type: against the close or against a second MA. MA Ratio
+  legs accept it too.
+
+### Changed
+
+- `@gainium/indicators` 1.9.0 → 1.10.0, which also brings 1.9.1: MA Ratio
+  legs of type VWMA now work when the type arrives in lower case, and VWMA
+  gives its first value on its length-th candle.
+
 ## [1.22.2] - 2026-10-27
 
 ### Fixed

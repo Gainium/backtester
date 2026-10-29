@@ -14,6 +14,7 @@ import {
   DEMA,
   TEMA,
   RMA,
+  McGinley,
   StochasticOscillator,
   StochasticRSI,
   SupportResistance,
@@ -76,6 +77,7 @@ export default class InternalIndicator {
     | DEMA
     | TEMA
     | RMA
+    | McGinley
     | StochasticOscillator
     | StochasticRSI
     | SupportResistance
@@ -527,6 +529,11 @@ export default class InternalIndicator {
         this.indicator = new RMA(indicatorConfig.interval)
         this.length = indicatorConfig.interval + add
       }
+      if (indicatorConfig.maType === MAEnum.mcginley) {
+        // recursive like EMA, so the same stabilisation buffer
+        this.indicator = new McGinley(indicatorConfig.interval)
+        this.length = indicatorConfig.interval + 300
+      }
     }
     if (indicatorConfig.type === IndicatorEnum.tv) {
       this.indicator = new TVTA(
@@ -648,6 +655,7 @@ export default class InternalIndicator {
         kind instanceof DEMA ||
         kind instanceof TEMA ||
         kind instanceof RMA ||
+        kind instanceof McGinley ||
         kind instanceof SMA ||
         kind instanceof WMA ||
         kind instanceof HMA)

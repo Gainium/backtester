@@ -115,6 +115,7 @@ export enum MAEnum {
   vwma = 'vwma',
   hma = 'hma',
   rma = 'rma',
+  mcginley = 'mcginley',
 }
 
 export enum TradingviewAnalysisSignalEnum {
