@@ -5,6 +5,12 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.27.1] - 2026-10-30
+
+### Fixed
+
+- Grid sizing with profit and order size in quote: each sell level is reserved at the buy price one level below it (the coin it carries), plus fee, so the start-up spend fits the budget instead of exceeding it by one grid step per sell level.
+
 ## [1.27.0] - 2026-10-29
 
 ### Changed

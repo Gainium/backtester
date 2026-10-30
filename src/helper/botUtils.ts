@@ -404,10 +404,22 @@ class BotUtils {
       }
     }
     const baseQuote = profitCurrency === 'base' && orderFixedIn === 'quote'
+    // Profit in quote: a sell level carries the coin the level below it bought
+    // (`sellQty` is `quoteAmount / buy[i-1]`), bought at the start price with a
+    // fee — reserve it at that buy price, not the level's own sell. Mirrors core.
+    const sellsFromLowerBuy =
+      profitCurrency === 'quote' && orderFixedIn === 'quote'
+    const sellUnits = (v: { buy: number; sell: number }) => {
+      if (!sellsFromLowerBuy) {
+        return 1 / v.sell
+      }
+      const k = prices.indexOf(v)
+      return (k > 0 ? 1 / prices[k - 1].buy : (1 + gs) / v.sell) * f
+    }
     if ((profitCurrency === 'quote' && orderFixedIn === 'quote') || baseQuote) {
       quoteAmount =
         B /
-        (sells.reduce((acc, v) => (acc += 1 / v.sell), 0) *
+        (sells.reduce((acc, v) => (acc += sellUnits(v)), 0) *
           (sellCount && newSell && baseQuote
             ? sells.reduce((acc, a) => acc + a.sell, 0) / sellCount
             : initPrice) +
@@ -415,7 +427,7 @@ class BotUtils {
       if (isNaN(quoteAmount) || !isFinite(quoteAmount) || !quoteAmount) {
         quoteAmount =
           B /
-          (sells.reduce((acc, v) => (acc += 1 / v.sell), 0) * initPrice +
+          (sells.reduce((acc, v) => (acc += sellUnits(v)), 0) * initPrice +
             buyCount * f)
       }
       if (quoteAmount < symbol.quoteAsset.minAmount) {
