@@ -6417,15 +6417,25 @@ export abstract class Strategy implements StrategyInterface {
    * peak-to-trough / trough-to-peak swing of the period's banked profit, on
    * that base. (The base was `initialBalanceUsd` — the first deal's pair
    * budget only — compounded period over period.)
+   *
+   * 1.28.0: the swing is walked in close order (the deals come in start
+   * order), and deals that close on the same bar are one step — so a period's
+   * path is a subsequence of the headline's and never swings further than it.
    */
   private getPeriodResult(deals: Deal[], base: number) {
+    const closed = [...deals].sort(
+      (a, b) => (a.closedTime ?? 0) - (b.closedTime ?? 0),
+    )
     let cumulative = 0
     let peak = 0
     let trough = 0
     let maxDrawdown = 0
     let maxRunup = 0
-    for (const d of deals) {
+    for (const [i, d] of closed.entries()) {
       cumulative += d.profit.totalUsd
+      if (closed[i + 1]?.closedTime === d.closedTime) {
+        continue
+      }
       peak = Math.max(peak, cumulative)
       trough = Math.min(trough, cumulative)
       maxDrawdown = Math.max(maxDrawdown, peak - cumulative)
@@ -7149,6 +7159,25 @@ export abstract class Strategy implements StrategyInterface {
     ].includes(this.settings.orderSizeType)
       ? Strategy.initialBalanceUsd
       : maxTheoreticalUsageValue * this.getRate()
+    // 1.28.0: the run starts from the whole budget, not from
+    // `initialBalanceUsd` (the first deal's pair budget only), and the headline
+    // drawdown / run-up are % of that fixed budget — the base of
+    // `netProfitTotalPerc` and the periodic stats — not of the running peak
+    const equityShift = maxTheoreticalUsageWithRate - Strategy.initialBalanceUsd
+    const budgetPerc = (usd: number) =>
+      this.math.round(
+        maxTheoreticalUsageWithRate > 0
+          ? (usd / maxTheoreticalUsageWithRate) * 100
+          : 0,
+        2,
+        false,
+        true,
+      )
+    allDeals = allDeals.map((d) =>
+      d.closedTime
+        ? { ...d, equity: this.math.round(d.equity + equityShift, 3) }
+        : d,
+    )
     /* Strategy.deals = Strategy.deals.map((d) => {
       if (!Strategy.combo) {
         d.ordersHistory = d.ordersHistory.filter(
@@ -7436,7 +7465,10 @@ export abstract class Strategy implements StrategyInterface {
     }
     const result: DCABacktestingResult = {
       messages: [...new Set(Strategy.messages)],
-      portfolio: Array.from(Strategy.portfolio, (v) => ({ x: v[0], y: v[1] })),
+      portfolio: Array.from(Strategy.portfolio, (v) => ({
+        x: v[0],
+        y: this.math.round(v[1] + equityShift),
+      })),
       buyAndHoldEquity: buyAndHold?.buyAndHoldEquity ?? [],
       indicatorsEvents: [...Strategy.indicatorEvents],
       symbolStats,
@@ -7562,31 +7594,16 @@ export abstract class Strategy implements StrategyInterface {
         maxDealProfitUsd: this.math.round(Strategy.maxProfit.usd, 2),
         maxDrawDown: -this.math.round(Strategy.seriesLoss.value, precision),
         maxDrawDownUsd: -this.math.round(Strategy.seriesLoss.valueUsd, 2),
-        maxDrawDownPerc: this.math.round(
-          Strategy.seriesLoss.perc * 100,
-          2,
-          false,
-          true,
-        ),
+        maxDrawDownPerc: budgetPerc(Strategy.seriesLoss.valueUsd),
         maxDrawDownEquityUsd: -this.math.round(
           Strategy.seriesLossE.valueUsd,
           2,
         ),
-        maxDrawDownEquityPerc: this.math.round(
-          Strategy.seriesLossE.perc * 100,
-          2,
-          false,
-          true,
-        ),
+        maxDrawDownEquityPerc: budgetPerc(Strategy.seriesLossE.valueUsd),
         maxRunUp: this.math.round(Strategy.seriesWin.value, precision),
         maxRunUpUsd: this.math.round(Strategy.seriesWin.valueUsd, 2),
-        maxRunUpPerc: this.math.round(
-          Strategy.seriesWin.perc * 100,
-          2,
-          false,
-          true,
-        ),
-        initialBalanceUsd: this.math.round(Strategy.initialBalanceUsd, 4),
+        maxRunUpPerc: budgetPerc(Strategy.seriesWin.valueUsd),
+        initialBalanceUsd: this.math.round(maxTheoreticalUsageWithRate, 4),
         stDevLosingTrade: stDevLoss,
         stDownDevLosingTrade: stDevDownLoss,
         stDevWinningTrade: stDevProfit,

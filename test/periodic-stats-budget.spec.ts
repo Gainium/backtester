@@ -42,10 +42,19 @@ const SYMBOLS = [
   mkSymbol('DDDUSDT', 'DDD'),
 ]
 
-const wave = (pair: string, phase: number, base: number): FullBar[] =>
+const flat = () => 1
+
+const wave = (
+  pair: string,
+  phase: number,
+  base: number,
+  trend: (k: number) => number = flat,
+): FullBar[] =>
   Array.from({ length: BARS }, (_, i) => {
     const p = (k: number) =>
-      base * (1 + 0.08 * Math.sin((k + phase) / 23) + 0.03 * Math.sin(k / 5))
+      base *
+      trend(k) *
+      (1 + 0.08 * Math.sin((k + phase) / 23) + 0.03 * Math.sin(k / 5))
     const open = p(i - 1)
     const close = p(i)
     return {
@@ -99,10 +108,10 @@ const settings = (pairs: Symbols[]) =>
 
 let runNo = 0
 
-const run = async (pairs: Symbols[]) => {
+const run = async (pairs: Symbols[], trend: (k: number) => number = flat) => {
   StrategyContextManager.setActiveContext(`periodic-stats-${++runNo}`)
   const bars = pairs
-    .flatMap((s, i) => wave(s.pair, i * 37, 50 + 30 * i))
+    .flatMap((s, i) => wave(s.pair, i * 37, 50 + 30 * i, trend))
     .sort((a, b) => a.time - b.time || a.symbol.localeCompare(b.symbol))
   const backtest = new DCABacktesting({
     exchange: ExchangeEnum.binance,
@@ -201,3 +210,81 @@ for (const pairs of [SYMBOLS, SYMBOLS.slice(0, 1)])
       }
     })
   })
+
+/**
+ * 1.28.0 — the headline drawdown / run-up and the equity curve start from the
+ * same capital: the whole budget. They started from `initialBalanceUsd` — the
+ * first deal's pair budget only — so a multi-pair run's equity could go below
+ * zero and its drawdown exceed 100%. The headline percentages are also on the
+ * fixed budget now (not on the running peak), like `netProfitTotalPerc` and the
+ * periods, so no period can show a deeper drawdown than the headline.
+ */
+const NEW_YEAR_BAR = 92 * 24
+/** Rallies to 2.5× through 2025, then gives back 12% early in 2026: a
+ * profitable run whose deepest drawdown comes after the profits are banked —
+ * the case where a drawdown on the running peak reads smaller than one year's
+ * drawdown on the budget. */
+const rallyThenDip = (k: number) =>
+  k < NEW_YEAR_BAR
+    ? 1 + (1.5 * k) / NEW_YEAR_BAR
+    : 2.5 * (1 - 0.12 * Math.min(1, (k - NEW_YEAR_BAR) / 150))
+
+for (const pairs of [SYMBOLS, SYMBOLS.slice(0, 1)])
+  for (const [market, trend] of [
+    ['ranging', flat],
+    ['rally then dip', rallyThenDip],
+  ] as const)
+    describe(`headline drawdown / equity, ${pairs.length}-pair DCA backtest, ${market} (1.28.0)`, () => {
+      let r: DCABacktestingResult
+      let budget: number
+      before(async () => {
+        r = await run(pairs, trend)
+        budget = r.usage.maxTheoreticalUsageWithRate
+      })
+
+      it('starts from the whole budget', () => {
+        expect(r.financial.initialBalanceUsd).to.be.closeTo(budget, 0.01)
+        const closed = r.deals.filter((d) => d.closedTime)
+        const at = (t: number) => closed.filter((d) => d.closedTime === t)
+        const first = Math.min(...closed.map((d) => d.closedTime!))
+        const last = Math.max(...closed.map((d) => d.closedTime!))
+        // deals closing on one bar are banked in engine order: one of the first
+        // is the first step off the budget, one of the last ends the chain
+        expect(
+          at(first).some(
+            (d) => Math.abs(d.equity - (budget + d.profit.totalUsd)) < 0.01,
+          ),
+        ).to.equal(true)
+        expect(
+          at(last).some(
+            (d) =>
+              Math.abs(d.equity - (budget + r.financial.netProfitTotalUsd)) <
+              0.01,
+          ),
+        ).to.equal(true)
+        // the curve starts at the budget, give or take the first bar's fees
+        expect(r.portfolio![0].y).to.be.closeTo(budget, budget * 0.01)
+      })
+
+      it('drawdown / run-up are % of the whole budget', () => {
+        const f = r.financial
+        const perc = (usd: number) => (Math.abs(usd) / budget) * 100
+        expect(f.maxDrawDownPerc).to.be.closeTo(perc(f.maxDrawDownUsd), 0.01)
+        expect(f.maxRunUpPerc).to.be.closeTo(perc(f.maxRunUpUsd), 0.01)
+        expect(f.maxDrawDownEquityPerc).to.be.closeTo(
+          perc(f.maxDrawDownEquityUsd ?? 0),
+          0.01,
+        )
+        expect(f.maxDrawDownPerc).to.be.below(100)
+      })
+
+      it('no period has a deeper drawdown or a larger run-up than the headline', () => {
+        for (const p of r.periodicStats!) {
+          const at = `${p.period} ${p.startTime}`
+          expect(-p.drawdown, at).to.be.at.most(
+            r.financial.maxDrawDownPerc + 0.01,
+          )
+          expect(p.runup, at).to.be.at.most(r.financial.maxRunUpPerc + 0.01)
+        }
+      })
+    })
