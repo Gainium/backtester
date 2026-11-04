@@ -369,35 +369,28 @@ class HedgeBacktesting extends Backtesting {
         (a, b) => timeIntervalMap[a.interval] - timeIntervalMap[b.interval],
       )[0].bar
 
-      const lowSize = longLowest.length / strategiesInfo.long.symbols.size
-      const shortSize = shortLowest.length / strategiesInfo.short.symbols.size
+      // Merge the two legs by bar time, not by array index: the legs can
+      // walk different timeframes (1h vs 15m) and start at different
+      // warm-up depths, so their i-th bars are not the same moment.
       const longTimeSet = new Set<number>()
       const shortTimeSet = new Set<number>()
-      for (let i = 0; i < Math.max(lowSize, shortSize); i++) {
-        const longSlice = longLowest.slice(
-          i * strategiesInfo.long.symbols.size,
-          (i + 1) * strategiesInfo.long.symbols.size,
-        )
-        const shortSlice = shortLowest.slice(
-          i * strategiesInfo.short.symbols.size,
-          (i + 1) * strategiesInfo.short.symbols.size,
-        )
-        for (const bar of longSlice) {
-          longTimeSet.add(bar.time)
-          const get = combinedMap.get(bar.time) || []
-          get.push({ ...bar, strategy: StrategyEnum.long })
-          combinedMap.set(bar.time, get)
-        }
-        for (const bar of shortSlice) {
-          shortTimeSet.add(bar.time)
-          const get = combinedMap.get(bar.time) || []
-          get.push({ ...bar, strategy: StrategyEnum.short })
-          combinedMap.set(bar.time, get)
-        }
+      for (const bar of longLowest) {
+        longTimeSet.add(bar.time)
+        const get = combinedMap.get(bar.time) || []
+        get.push({ ...bar, strategy: StrategyEnum.long })
+        combinedMap.set(bar.time, get)
+      }
+      for (const bar of shortLowest) {
+        shortTimeSet.add(bar.time)
+        const get = combinedMap.get(bar.time) || []
+        get.push({ ...bar, strategy: StrategyEnum.short })
+        combinedMap.set(bar.time, get)
       }
 
       const combinedArray: (FullBar & { strategy: StrategyEnum })[][] =
-        Array.from(combinedMap.values())
+        Array.from(combinedMap.entries())
+          .sort(([a], [b]) => a - b)
+          .map(([, timeBars]) => timeBars)
 
       // Initialize both strategies for controlled processing with their respective data
       this.setLongContext()

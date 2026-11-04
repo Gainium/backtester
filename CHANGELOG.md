@@ -5,6 +5,12 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.28.1] - 2026-11-04
+
+### Fixed
+
+- Hedge backtests with the shared take profit or stop loss: each leg's candles are now processed in time order. The legs were merged by position instead of by time, so legs on different timeframes, or with indicators that need a different amount of history, were replayed out of order. Deals could then end before they started, or fill more safety orders than the maximum.
+
 ## [1.28.0] - 2026-11-01
 
 ### Changed
