@@ -5916,7 +5916,9 @@ export abstract class Strategy implements StrategyInterface {
     ) {
       const trigger = +this.settings.moveSLTrigger / 100
       const value = +this.settings.moveSLValue / 100
-      const last = this.long ? b.low : b.high
+      // the favourable extreme of the segment: live moves the stop as soon as
+      // a tick touches the trigger, so a wick through it counts
+      const last = this.long ? b.high : b.low
       const { avgPrice } = d
       const diff = this.long
         ? last - (avgPrice ?? last)

@@ -5,6 +5,12 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.28.2] - 2026-11-06
+
+### Fixed
+
+- Move stop loss: the trigger is now reached as soon as the price touches it inside a candle, including on a wick, the same as live bots. Before, the trigger was measured at the candle's opposite extreme (the low for a long, the high for a short). A candle that wicked through the trigger, or hit the first take profit, without closing beyond it left the stop loss in place.
+
 ## [1.28.1] - 2026-11-04
 
 ### Fixed
