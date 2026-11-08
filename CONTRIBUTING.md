@@ -239,7 +239,7 @@ While the project doesn't currently have a comprehensive test suite, contributio
 3. **Documentation Updates**
    - Update relevant documentation
    - Add JSDoc comments for new APIs
-   - Update CHANGELOG.md if applicable
+   - Add a `.changes/` entry if applicable (see `.changes/README.md`) — never edit the version or `CHANGELOG.md` directly
 
 ### PR Guidelines
 
@@ -268,7 +268,7 @@ Brief description of changes
 
 ## Documentation
 - [ ] Documentation updated
-- [ ] CHANGELOG.md updated (if needed)
+- [ ] `.changes/` entry added (if needed)
 ```
 
 ## Issue Reporting
