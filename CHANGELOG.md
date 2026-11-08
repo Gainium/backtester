@@ -5,6 +5,12 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.29.0] - 2026-11-08
+
+### Added
+
+- `dealStats` on DCA and combo results: a fixed-size summary of the closed deals (count, winners, mean and spread of the deal return %, quantiles, a 20-bin histogram, and deal durations). Its size does not grow with the number of deals, so it can be kept with a saved backtest when the deal list cannot. `dealStatsOf`, `returnStatsOf` and `compareReturnStats` (the strategy-vs-random test) are exported from `dist/helper/dealStats`.
+
 ## [1.28.2] - 2026-11-06
 
 ### Fixed

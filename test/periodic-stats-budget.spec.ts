@@ -171,6 +171,17 @@ for (const pairs of [SYMBOLS, SYMBOLS.slice(0, 1)])
       expect(r.numerical.open).to.be.at.most(pairs.length * 2)
     })
 
+    it('dealStats summarises the same closed deals (1.29.0)', () => {
+      const closed = r.deals.filter((d) => d.status === 'closed')
+      const s = r.dealStats!
+      expect(s.closed).to.equal(closed.length)
+      expect(s.histogram.counts.reduce((a, b) => a + b, 0)).to.equal(
+        closed.length,
+      )
+      const mean = closed.reduce((a, d) => a + d.profit.perc, 0) / closed.length
+      expect(s.mean).to.be.closeTo(mean, 1e-3)
+    })
+
     it('the years add up to the headline netProfitTotalPerc', () => {
       const headline = r.financial.netProfitTotalPerc
       expect(headline).to.not.equal(0)

@@ -1956,6 +1956,35 @@ export type PeriodicStats = {
   }
 }
 
+/** Count, mean and sample sd of deal returns (profit %). */
+export type ReturnStats = {
+  n: number
+  mean: number
+  sd: number
+}
+
+/**
+ * 1.29.0 — fixed-size summary of the closed deals (helper/dealStats). Saved
+ * with a backtest in place of the deal list, which has no upper bound.
+ * Returns are each deal's profit %; durations are ms.
+ */
+export type DealStats = {
+  closed: number
+  winners: number
+  mean: number
+  sd: number
+  min: number
+  max: number
+  p5: number
+  p25: number
+  p50: number
+  p75: number
+  p95: number
+  /** Equal-width bins from `from`, `step` wide; one bin when every return is equal. */
+  histogram: { from: number; step: number; counts: number[] }
+  duration: { mean: number; p50: number; p95: number; max: number }
+}
+
 export type DCABacktestingResult = {
   // pair: string
   portfolio?: { x: number; y: number }[]
@@ -2074,6 +2103,7 @@ export type DCABacktestingResult = {
   multiPairs?: number
   symbolStats?: SymbolStats[]
   periodicStats?: PeriodicStats[]
+  dealStats?: DealStats
   messages?: string[]
 }
 

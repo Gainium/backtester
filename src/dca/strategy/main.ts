@@ -45,6 +45,7 @@ import {
   RRSlTypeEnum,
 } from '../../types'
 import { friendlyTime } from '../../helper/timeFunctions'
+import { dealStatsOf } from '../../helper/dealStats'
 import { MathHelper } from '../../helper/math'
 import findUSDRate from '../../helper/price'
 import type { Indicator } from './ti/index'
@@ -7712,6 +7713,8 @@ export abstract class Strategy implements StrategyInterface {
         : undefined,
       periodicStats,
     }
+    // the prepared deals, as the dashboard's analysis reads them
+    result.dealStats = dealStatsOf(result.deals)
     Strategy.resetData()
     return result
   }
