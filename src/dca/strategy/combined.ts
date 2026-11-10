@@ -58,6 +58,23 @@ if (typeof window === 'undefined') {
   }
 }
 
+/**
+ * The file loop is one long run of awaits that never leaves the microtask
+ * queue, so it hands the event loop back to the host now and then: timers,
+ * I/O and messages of the host are served and a `stop` set from outside is
+ * seen. A pause after every bar costs a timer tick (1 ms or more) per bar,
+ * which adds up to far more than the run itself; one pause per
+ * `FILE_LOOP_PAUSE_EVERY` bars keeps the host responsive at no measurable
+ * cost. `setImmediate` where the runtime has it, a zero timer elsewhere.
+ * The pause does not take part in the calculation.
+ */
+const FILE_LOOP_PAUSE_EVERY = 1000
+
+const pauseFileLoop: () => Promise<void> =
+  typeof setImmediate === 'function'
+    ? () => new Promise((resolve) => setImmediate(resolve))
+    : () => new Promise((resolve) => setTimeout(resolve, 0))
+
 class CombinedStrategy extends Strategy implements StrategyInterface {
   private strategies: StrategyInterface[] = []
 
@@ -119,6 +136,7 @@ class CombinedStrategy extends Strategy implements StrategyInterface {
             this.settings.pair.length
         const _data = getFileLinesSync(file, 'utf-8')
         if (_data) {
+          let processed = 0
           for (const d of _data) {
             if (this._stop) {
               return
@@ -155,7 +173,9 @@ class CombinedStrategy extends Strategy implements StrategyInterface {
             if (Strategy.lowestInterval === bar.interval) {
               last.set(bar.symbol, bar)
             }
-            await new Promise((resolve) => setTimeout(resolve, 0))
+            if (++processed % FILE_LOOP_PAUSE_EVERY === 0) {
+              await pauseFileLoop()
+            }
           }
           for (const b of last.values()) {
             if (Strategy.portfolio.has(b.time)) {
