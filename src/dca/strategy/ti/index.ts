@@ -207,6 +207,13 @@ class TIStrategy extends Strategy implements StrategyInterface {
   private lowestData: DataType[] = []
   private firstBar: Map<string, number> = new Map()
   private nextBarTime: Map<string, number> = new Map()
+  private higherBars: WeakMap<
+    Map<string, FullBar>,
+    {
+      size: number
+      bySymbol: Map<string, { bars: FullBar[]; ordered: boolean }>
+    }
+  > = new WeakMap()
   private nextAction = false
   private indicatorGroupsToUse: SettingsIndicatorGroup[] = []
   private hasSessionInd = false
@@ -971,6 +978,35 @@ class TIStrategy extends Strategy implements StrategyInterface {
     })
   }
 
+  /**
+   * One pair's candles of a higher interval, in the order they were loaded,
+   * and whether that order is by time. Indexed once per loaded data set.
+   */
+  private higherBarsOf(
+    data: Map<string, FullBar>,
+    symbol: string,
+  ): { bars: FullBar[]; ordered: boolean } | undefined {
+    let index = this.higherBars.get(data)
+    if (!index || index.size !== data.size) {
+      const bySymbol: Map<string, { bars: FullBar[]; ordered: boolean }> =
+        new Map()
+      for (const b of data.values()) {
+        const entry = bySymbol.get(b.symbol)
+        if (!entry) {
+          bySymbol.set(b.symbol, { bars: [b], ordered: true })
+          continue
+        }
+        if (!(b.time > entry.bars[entry.bars.length - 1].time)) {
+          entry.ordered = false
+        }
+        entry.bars.push(b)
+      }
+      index = { size: data.size, bySymbol }
+      this.higherBars.set(data, index)
+    }
+    return index.bySymbol.get(symbol)
+  }
+
   public async processBar(
     checkPortfolio: boolean,
     bar: FullBar,
@@ -1045,25 +1081,48 @@ class TIStrategy extends Strategy implements StrategyInterface {
         }
         const _data = Strategy.dataMap.get(i.interval)
         if (_data) {
-          const data = Array.from(_data.values())
+          // this pair's candles of the interval, in the order they were
+          // loaded; the candles of every pair used to be copied and filtered
+          // here at each step
+          const own = this.higherBarsOf(_data, bar.symbol)
+          const data = own?.bars ?? []
           let bars: FullBar[] = []
-          if ((this.firstBar.get(bar.symbol) ?? 0) < restIndicators.length) {
+          const withHistory =
+            (this.firstBar.get(bar.symbol) ?? 0) < restIndicators.length
+          if (withHistory) {
             this.firstBar.set(
               bar.symbol,
               (this.firstBar.get(bar.symbol) ?? 0) + 1,
             )
-            bars = data.filter(
-              (b) => b.time < range[0] && b.symbol === bar.symbol,
-            )
           }
-
-          for (const d of data.filter(
-            (b) =>
-              b.time >= range[0] &&
-              b.time <= range[1] &&
-              b.symbol === bar.symbol,
-          )) {
-            bars.push(d)
+          if (own?.ordered) {
+            // in time order: the first candle at or after the range start
+            // splits history from the range
+            let lo = 0
+            let hi = data.length
+            while (lo < hi) {
+              const mid = (lo + hi) >>> 1
+              if (data[mid].time < range[0]) {
+                lo = mid + 1
+              } else {
+                hi = mid
+              }
+            }
+            if (withHistory) {
+              bars = data.slice(0, lo)
+            }
+            for (; lo < data.length && data[lo].time <= range[1]; lo++) {
+              bars.push(data[lo])
+            }
+          } else {
+            if (withHistory) {
+              bars = data.filter((b) => b.time < range[0])
+            }
+            for (const d of data) {
+              if (d.time >= range[0] && d.time <= range[1]) {
+                bars.push(d)
+              }
+            }
           }
 
           hasRest = bars.length > 0
