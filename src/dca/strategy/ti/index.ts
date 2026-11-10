@@ -875,19 +875,37 @@ class TIStrategy extends Strategy implements StrategyInterface {
   }
 
   private checkStatuses(time: number) {
-    Strategy.indicators = Strategy.indicators.map((i) => {
-      const findStatus = i.statuses.find(
-        (s) => time >= s.statusSince && time < s.statusTo,
-      )
+    // the entries are updated where they are: the list comes out with the
+    // same entries in the same places, so it is not rebuilt. Each entry
+    // still gets a new `statuses` array, as copies of an entry share theirs.
+    for (const i of Strategy.indicators) {
+      const pending = i.statuses
+      let findStatus: Status | undefined
+      for (const s of pending) {
+        if (time >= s.statusSince && time < s.statusTo) {
+          findStatus = s
+          break
+        }
+      }
+      const kept: Status[] = []
       if (findStatus) {
-        i.statuses = i.statuses.filter(
-          (s) =>
+        for (const s of pending) {
+          if (
             s.statusSince !== findStatus.statusSince &&
-            s.statusTo !== findStatus.statusTo,
-        )
+            s.statusTo !== findStatus.statusTo
+          ) {
+            kept.push(s)
+          }
+        }
+        i.statuses = kept
         i.status = findStatus
       } else {
-        i.statuses = i.statuses.filter((s) => s.statusTo > time)
+        for (const s of pending) {
+          if (s.statusTo > time) {
+            kept.push(s)
+          }
+        }
+        i.statuses = kept
         if (i.status.statusTo < time) {
           i.status = {
             status: false,
@@ -896,9 +914,7 @@ class TIStrategy extends Strategy implements StrategyInterface {
           }
         }
       }
-
-      return i
-    })
+    }
   }
 
   public processTrade(
