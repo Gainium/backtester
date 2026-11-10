@@ -1,0 +1,12 @@
+{
+  "sha256": "2e87226912ef16ac06a2d2bcccf4aadeb4c4fe23af973a18e62dbaee8331a062",
+  "deals": 15,
+  "closed": 15,
+  "netProfitTotal": 45.0402,
+  "maxDrawDownPerc": 0,
+  "indicatorsEvents": 1472,
+  "fed": {
+    "candles": 4346,
+    "sha256": "3f9fa7b0435a47d48d0549a30066145db3dc6204686160b4d3a9d47ceb256a68"
+  }
+}
