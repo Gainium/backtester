@@ -210,6 +210,13 @@ class TIStrategy extends Strategy implements StrategyInterface {
   private nextAction = false
   private indicatorGroupsToUse: SettingsIndicatorGroup[] = []
   private hasSessionInd = false
+  /**
+   * Where each indicator id sits in `Strategy.indicators`. Entries are only
+   * ever replaced in place by one with the same id, so the positions hold
+   * for the whole run; they are still checked on every use.
+   */
+  private indicatorPositions: Map<string, number[]> = new Map()
+  private indicatorPositionsSize = -1
   constructor(input: StrategyInput) {
     /* input.settings.indicators = input.settings.indicators.filter(
       (i) => i.indicatorAction !== IndicatorAction.stopBot,
@@ -1088,12 +1095,44 @@ class TIStrategy extends Strategy implements StrategyInterface {
     })
   }
 
+  private positionsOf(id: string): number[] {
+    const list = Strategy.indicators
+    let positions = this.indicatorPositions.get(id)
+    let valid = !!positions && list.length === this.indicatorPositionsSize
+    if (positions && valid) {
+      for (const p of positions) {
+        if (list[p].id !== id) {
+          valid = false
+          break
+        }
+      }
+    }
+    if (!valid) {
+      this.indicatorPositions = new Map()
+      this.indicatorPositionsSize = list.length
+      for (let p = 0; p < list.length; p++) {
+        const at = this.indicatorPositions.get(list[p].id)
+        if (at) {
+          at.push(p)
+        } else {
+          this.indicatorPositions.set(list[p].id, [p])
+        }
+      }
+      positions = this.indicatorPositions.get(id)
+    }
+    return positions ?? []
+  }
+
   private updateIndicatorData(i: Indicator) {
     return (d: IndicatorHistory[]) => {
       i.data = d
-      Strategy.indicators = [...Strategy.indicators].map((ii) =>
-        ii.id === i.id ? i : ii,
-      )
+      // every entry with this id becomes `i` (it normally is `i` already);
+      // nothing keeps the list itself, so it is updated in place rather than
+      // rebuilt on every value
+      const list = Strategy.indicators
+      for (const p of this.positionsOf(i.id)) {
+        list[p] = i
+      }
     }
   }
 
