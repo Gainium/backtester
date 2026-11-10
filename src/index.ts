@@ -61,6 +61,7 @@ if (typeof window === 'undefined') {
     }
     return `${d.open};${d.high};${d.low};${d.close};${d.volume};${d.time};${d.symbol};${d.interval}`
   }
+  const WRITE_CHUNK_CANDLES = 1000
   const fs = require('fs')
   const esort = require('external-sorting').default
   const path = require('path')
@@ -84,11 +85,20 @@ if (typeof window === 'undefined') {
       if (!fs.existsSync(file)) {
         fs.writeFileSync(file, 'o;h;l;c;v;t;s;i\n')
       }
+      // one write per chunk of candles; the bytes written are the same as
+      // with one write per candle
+      let chunk = ''
+      let pending = 0
       for (const d of data) {
-        fs.appendFileSync(
-          file,
-          `${d.open};${d.high};${d.low};${d.close};${d.volume};${d.time};${d.symbol};${interval}\n`,
-        )
+        chunk += `${d.open};${d.high};${d.low};${d.close};${d.volume};${d.time};${d.symbol};${interval}\n`
+        if (++pending === WRITE_CHUNK_CANDLES) {
+          fs.appendFileSync(file, chunk)
+          chunk = ''
+          pending = 0
+        }
+      }
+      if (pending) {
+        fs.appendFileSync(file, chunk)
       }
     }
 
