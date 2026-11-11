@@ -5,6 +5,14 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.29.2] - 2026-11-11
+
+### Changed
+
+- A DCA / combo backtest run from candles in memory with indicators on a higher interval no longer copies and filters that interval's candles of every pair at each step; they are indexed per pair once. Results are unchanged, multi-pair runs with higher-interval indicators are noticeably faster
+- A DCA / combo backtest with indicators no longer rebuilds its whole indicator list every time one indicator produces a value; the entry is updated in place. Results are unchanged
+- The per-candle pass that makes each indicator's pending status current no longer rebuilds the indicator list or allocates callbacks per indicator. Results are unchanged
+
 ## [1.29.1] - 2026-11-11
 
 ### Changed
