@@ -5,6 +5,12 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.31.1] - 2026-11-16
+
+### Fixed
+
+- Test suite: the result fingerprint no longer hashes the closed-deals summary, which is computed from the deals already hashed; goldens cut before that summary existed match again, unchanged. No engine or result change
+
 ## [1.31.0] - 2026-11-16
 
 ### Added
