@@ -21,6 +21,7 @@ import {
   StartConditionEnum,
   StrategyEnum,
 } from '../src/types'
+import { hashed } from './helpers/singlePositionHarness'
 import type {
   DCABacktestingResult,
   DCABotSettings,
@@ -267,7 +268,9 @@ function fingerprint(r: unknown): Fingerprint {
     financial: { netProfitTotal: number; maxDrawDownPerc: number }
   }
   return {
-    sha256: createHash('sha256').update(JSON.stringify(r)).digest('hex'),
+    sha256: createHash('sha256')
+      .update(JSON.stringify(hashed(r)))
+      .digest('hex'),
     deals: res.deals.length,
     closed: res.deals.filter((d) => d.status === 'closed').length,
     netProfitTotal: res.financial.netProfitTotal,

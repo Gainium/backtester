@@ -195,6 +195,22 @@ const STRIP = new Set([
   'processingDataTime',
 ])
 
+/**
+ * Top-level result fields left out of the hash. Each is a summary computed
+ * from fields that are hashed (`dealStats` from `deals`) and has a spec of
+ * its own, so hashing it adds no coverage; it only makes every golden cut
+ * before the field existed fail. A new derived top-level field goes here
+ * rather than into a regeneration of the goldens.
+ */
+export const UNHASHED = ['dealStats']
+
+/** The normalised result without the fields in `UNHASHED`. */
+export function hashed<T>(r: T): T {
+  const out = { ...r } as Record<string, unknown>
+  for (const k of UNHASHED) delete out[k]
+  return out as T
+}
+
 export function normalise(v: unknown): unknown {
   if (Array.isArray(v)) return v.map(normalise)
   if (v && typeof v === 'object') {
@@ -224,7 +240,9 @@ export function fingerprint(result: DCABacktestingResult): Fingerprint {
     financial: { netProfitTotal: number; maxDrawDownPerc: number }
   }
   return {
-    sha256: createHash('sha256').update(JSON.stringify(r)).digest('hex'),
+    sha256: createHash('sha256')
+      .update(JSON.stringify(hashed(r)))
+      .digest('hex'),
     deals: r.deals.length,
     closed: r.deals.filter((d) => d.status === 'closed').length,
     netProfitTotal: r.financial.netProfitTotal,
