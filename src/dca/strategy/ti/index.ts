@@ -1,3 +1,8 @@
+import {
+  dcaLevelTriggered,
+  startDcaLevelGroups,
+  startDcaLevels,
+} from './levels'
 import { combineIndicatorGroups } from './groupLogic'
 import { Strategy, StrategyInterface } from '../main'
 import InternalIndicator from './indicatorLoader'
@@ -2684,25 +2689,46 @@ class TIStrategy extends Strategy implements StrategyInterface {
         startDcaStatus.length &&
         this.settings.dcaCondition === DCAConditionEnum.indicators
       ) {
-        for (const i of startDcaStatus) {
-          Strategy.indicators = Strategy.indicators.map((is) => {
-            if (i.id === is.id) {
-              return {
-                ...i,
-                status: {
-                  ...i.status,
-                  status: i.status.statusTo
-                    ? i.status.statusTo >
-                      timeIntervalMap[i.interval] + nextBar.time
-                      ? i.status.status
-                      : false
-                    : false,
-                },
+        // Spec 244: a level fires when its conditions hold — its own
+        // `startDca` groups, or, for a level without groups, its single
+        // indicator. Mirrors the live engine (main-app-sh dcaHelper
+        // checkIndicatorStatus).
+        const symbol = nextBar.symbol
+        const activeIds = new Set(startDcaStatus.map((i) => i.id))
+        const loadedIds = new Set(startDca.map((i) => i.id))
+        const fired = startDcaLevels(this.settings.indicators)
+          .map((level, index) => ({ level, index }))
+          .filter(({ level }) =>
+            dcaLevelTriggered(
+              level,
+              startDcaLevelGroups(this.indicatorGroupsToUse, level.key),
+              (uuid) => activeIds.has(`${uuid}@${symbol}`),
+              (uuid) => loadedIds.has(`${uuid}@${symbol}`),
+            ),
+          )
+        for (const { level, index } of fired) {
+          const levelIds = new Set(
+            level.indicators.map((li) => `${li.uuid}@${symbol}`),
+          )
+          for (const i of startDcaStatus.filter((s) => levelIds.has(s.id))) {
+            Strategy.indicators = Strategy.indicators.map((is) => {
+              if (i.id === is.id) {
+                return {
+                  ...i,
+                  status: {
+                    ...i.status,
+                    status: i.status.statusTo
+                      ? i.status.statusTo >
+                        timeIntervalMap[i.interval] + nextBar.time
+                        ? i.status.status
+                        : false
+                      : false,
+                  },
+                }
               }
-            }
-            return is
-          })
-          const index = startDca.findIndex((si) => si.id === i.id)
+              return is
+            })
+          }
           this.addDCAOrder(
             index,
             /* lowestBar?.close ?? */ nextBar.close,

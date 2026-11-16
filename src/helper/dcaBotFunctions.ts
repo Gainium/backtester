@@ -1,3 +1,4 @@
+import { startDcaLevelAnchors } from '../dca/strategy/ti/levels'
 import {
   BotOrderSideEnum,
   StrategyEnum,
@@ -454,9 +455,7 @@ class DCABotFunctions {
     if (settings.useDca) {
       const ordersCount =
         settings.dcaCondition === DCAConditionEnum.indicators
-          ? settings.indicators.filter(
-              (i) => i.indicatorAction === IndicatorAction.startDca,
-            ).length
+          ? startDcaLevelAnchors(settings.indicators).length
           : settings.dcaCondition === DCAConditionEnum.custom
             ? (settings.dcaCustom ?? []).length
             : parseInt(`${settings.ordersCount}`)
@@ -504,9 +503,8 @@ class DCABotFunctions {
         if (settings.dcaCondition === DCAConditionEnum.indicators) {
           const indicatorValue =
             +(
-              settings.indicators.filter(
-                (ind) => ind.indicatorAction === IndicatorAction.startDca,
-              )[i - 1]?.minPercFromLast ?? '100'
+              startDcaLevelAnchors(settings.indicators)[i - 1]
+                ?.minPercFromLast ?? '100'
             ) / 100
           price = this.math.round(
             (i === 1 ? latestPrice : orders[orders.length - 1].price) *
@@ -615,9 +613,7 @@ class DCABotFunctions {
         ) {
           orderSize =
             +(
-              settings.indicators.filter(
-                (ind) => ind.indicatorAction === IndicatorAction.startDca,
-              )[i - 1]?.orderSize ?? '0'
+              startDcaLevelAnchors(settings.indicators)[i - 1]?.orderSize ?? '0'
             ) || _orderSize
         }
         if (

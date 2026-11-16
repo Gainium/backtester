@@ -1,3 +1,4 @@
+import { startDcaLevelAnchors } from './ti/levels'
 import { groupStandsAlone } from './ti/groupLogic'
 import { v4 } from 'uuid'
 import { StrategyContextManager } from './context'
@@ -2991,9 +2992,7 @@ export abstract class Strategy implements StrategyInterface {
       levels: {
         all: this.settings.useDca
           ? this.settings.dcaCondition === DCAConditionEnum.indicators
-            ? this.settings.indicators.filter(
-                (si) => si.indicatorAction === IndicatorAction.startDca,
-              ).length + 1
+            ? startDcaLevelAnchors(this.settings.indicators).length + 1
             : this.settings.dcaCondition === DCAConditionEnum.custom
               ? (this.settings.dcaCustom ?? []).length + 1
               : initialOrders.filter((o) => o.type === DCAOrderTypeEnum.dca)
@@ -4313,9 +4312,7 @@ export abstract class Strategy implements StrategyInterface {
       (dd) => dd.lastFilled + 1 === index + 1,
     )) {
       if (this.settings.dcaCondition === DCAConditionEnum.indicators) {
-        const ind = this.settings.indicators.filter(
-          (i) => i.indicatorAction === IndicatorAction.startDca,
-        )[index]
+        const ind = startDcaLevelAnchors(this.settings.indicators)[index]
         if (ind) {
           const botFunctions = this.botFunctions.get(d.symbol.pair)
           if (!botFunctions) {

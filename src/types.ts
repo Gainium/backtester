@@ -668,6 +668,10 @@ export type SettingsIndicators = {
   indicatorCondition: IndicatorStartConditionEnum
   groupId: string
   uuid: string
+  /** DCA by indicators: the ladder level of this `startDca` condition (spec 244). */
+  dcaLevel?: string
+  /** Display only: keep the indicator off the chart. */
+  hideOnChart?: boolean
   indicatorInterval: ExchangeIntervals
   signal?: TradingviewAnalysisSignalEnum
   condition?: TradingviewAnalysisConditionEnum
@@ -1093,6 +1097,8 @@ export type SettingsIndicatorGroup = {
    * the bot-level logic (startDealLogic, stopDealLogic, ...).
    */
   join?: IndicatorsLogicEnum
+  /** `startDca` groups only: the DCA ladder level they hold (spec 244). */
+  dcaLevel?: string
 }
 
 export enum RRSlTypeEnum {
