@@ -93,6 +93,8 @@ import {
   SqueezeResult,
   squeezeCondition,
   resolveSqueezeSettings,
+  OBVResult,
+  obvCondition,
 } from '@gainium/indicators'
 
 type Status = {
@@ -173,6 +175,21 @@ const withIndicatorModes = (
       kdjKSmooth: +(i.kdjKSmooth || 3),
       kdjDSmooth: +(i.kdjDSmooth || 3),
     }
+  }
+  // OBV / CMF / CHOP: the stored settings, resolved by the loader as the
+  // indicators package's factory resolves them
+  if (i.type === IndicatorEnum.obv) {
+    return {
+      type: IndicatorEnum.obv,
+      obvMaType: i.obvMaType,
+      obvMaLength: i.obvMaLength,
+    }
+  }
+  if (i.type === IndicatorEnum.cmf) {
+    return { type: IndicatorEnum.cmf, cmfLength: i.cmfLength }
+  }
+  if (i.type === IndicatorEnum.chop) {
+    return { type: IndicatorEnum.chop, chopLength: i.chopLength }
   }
   if (i.type === IndicatorEnum.vwap) {
     return {
@@ -1559,6 +1576,17 @@ class TIStrategy extends Strategy implements StrategyInterface {
               stochLower,
             },
           )
+        } else if (type === IndicatorEnum.obv) {
+          // OBV against its own average (never a level); indicatorValue is
+          // not read
+          const [ld, pd] = [...data].sort((a, b) => b.time - a.time)
+          action = obvCondition(
+            ld?.value as OBVResult,
+            pd?.value as OBVResult,
+            {
+              condition: indicatorCondition,
+            },
+          )
         } else if (type === IndicatorEnum.adx && adxMode === ADXModeEnum.dmi) {
           // DMI mode: +DI against −DI; indicatorValue is not read
           const [ld, pd] = [...data].sort((a, b) => b.time - a.time)
@@ -1831,6 +1859,22 @@ class TIStrategy extends Strategy implements StrategyInterface {
                   lastData.value.trend === 2) ||
                 (trendFilterType === TrendFilterOperatorEnum.between &&
                   lastData.value.trend === 3)
+            }
+          }
+          if (
+            (lastData.type === IndicatorEnum.cmf &&
+              prevData.type === IndicatorEnum.cmf) ||
+            (lastData.type === IndicatorEnum.chop &&
+              prevData.type === IndicatorEnum.chop)
+          ) {
+            // MFI's comparison of the line with indicatorValue; no
+            // percentile, smoothing or trend filter on these two
+            last = lastData.value?.value
+            prev = prevData.value?.value
+            if (!Number.isFinite(last) || !Number.isFinite(prev)) {
+              // settings the indicators package refuses build no indicator
+              skipAction = true
+              action = false
             }
           }
           if (

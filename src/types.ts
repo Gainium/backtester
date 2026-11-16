@@ -18,6 +18,7 @@ import type {
   CandleResult,
   OrderBlockResult,
   SqueezeResult,
+  OBVResult,
 } from '@gainium/indicators'
 
 export const DirName = `../../tmp-backtester`
@@ -69,6 +70,9 @@ export enum IndicatorEnum {
   candle = 'CANDLE',
   ob = 'OB',
   sqz = 'SQZ',
+  obv = 'OBV',
+  cmf = 'CMF',
+  chop = 'CHOP',
 }
 
 /** Candle colour: which candle the colour is read from (the indicators package's CandleSourceEnum). */
@@ -237,6 +241,9 @@ export enum MAEnum {
   hma = 'hma',
   rma = 'rma',
   mcginley = 'mcginley',
+  kama = 'kama',
+  alma = 'alma',
+  lsma = 'lsma',
 }
 
 export enum TradingviewAnalysisSignalEnum {
@@ -387,6 +394,8 @@ type DivergenceOscillators =
   | IndicatorEnum.vo
   | IndicatorEnum.bbpb
   | IndicatorEnum.stoch
+  | IndicatorEnum.obv
+  | IndicatorEnum.cmf
 
 export enum RangeType {
   atr = 'ATR',
@@ -408,6 +417,15 @@ export type IndicatorConfigBackTesting =
       vwapAnchor: VWAPAnchorEnum
     }
   | { type: IndicatorEnum.ote; oteLeftBars: number; oteMinLegSize: number }
+  | {
+      // the stored settings; the loader resolves them as the indicators
+      // package's factory does (unusable = no indicator)
+      type: IndicatorEnum.obv
+      obvMaType?: MAEnum | string | null
+      obvMaLength?: number | string | null
+    }
+  | { type: IndicatorEnum.cmf; cmfLength?: number | string | null }
+  | { type: IndicatorEnum.chop; chopLength?: number | string | null }
   | { type: IndicatorEnum.candle; source: CandleSourceEnum }
   | { type: IndicatorEnum.ob; swingLength: number }
   | {
@@ -655,6 +673,8 @@ export type IndicatorHistory = { time: number } & (
   | { type: IndicatorEnum.candle; value: CandleResult }
   | { type: IndicatorEnum.ob; value: OrderBlockResult }
   | { type: IndicatorEnum.sqz; value: SqueezeResult }
+  | { type: IndicatorEnum.obv; value: OBVResult }
+  | { type: IndicatorEnum.cmf | IndicatorEnum.chop; value: { value: number } }
   /** in / out: the clock filter's status; levels: the SessionLevels result */
   | { type: IndicatorEnum.session; value: boolean | SessionLevelsResult }
 )
@@ -881,6 +901,18 @@ export type SettingsIndicators = {
   divRangeLower?: number
   /** Divergence: most bars between pivots (2..500); missing = 60, as before. */
   divRangeUpper?: number
+  /**
+   * OBV: average of the OBV line (the indicators package's OBV_MA_TYPES),
+   * missing = sma. The condition is OBV against this average (cu / cd /
+   * gt / lt); OBV has no value field.
+   */
+  obvMaType?: MAEnum
+  /** OBV: length of that average (1..1000), missing = 20. */
+  obvMaLength?: number
+  /** Chaikin Money Flow: length (1..1000), missing = 20. */
+  cmfLength?: number
+  /** Choppiness Index: length (2..1000), missing = 14. */
+  chopLength?: number
   /**
    * Session Price levels: where the condition is evaluated — missing /
    * 'session' only inside the session (as before), 'outside' only outside it,

@@ -15,6 +15,9 @@ import {
   TEMA,
   RMA,
   McGinley,
+  KAMA,
+  ALMA,
+  LSMA,
   StochasticOscillator,
   StochasticRSI,
   SupportResistance,
@@ -56,6 +59,17 @@ import {
   OB_WARMUP,
   Squeeze,
   squeezeWarmup,
+  OBV,
+  obvWarmup,
+  resolveOBVSettings,
+  OBV_DEFAULT_MA_TYPE,
+  OBV_DEFAULT_MA_LENGTH,
+  CMF,
+  resolveCMFLength,
+  CMF_DEFAULT_LENGTH,
+  CHOP,
+  resolveChopLength,
+  CHOP_DEFAULT_LENGTH,
   SmoothedIndicator,
   getSmoothingWarmup,
   isSmoothableIndicator,
@@ -89,6 +103,9 @@ export default class InternalIndicator {
     | TEMA
     | RMA
     | McGinley
+    | KAMA
+    | ALMA
+    | LSMA
     | StochasticOscillator
     | StochasticRSI
     | SupportResistance
@@ -124,6 +141,9 @@ export default class InternalIndicator {
     | Candle
     | OrderBlocks
     | Squeeze
+    | OBV
+    | CMF
+    | CHOP
     | SmoothedIndicator
   private data: IndicatorHistory[] = []
 
@@ -553,6 +573,20 @@ export default class InternalIndicator {
         this.indicator = new McGinley(indicatorConfig.interval)
         this.length = indicatorConfig.interval + 300
       }
+      if (indicatorConfig.maType === MAEnum.kama) {
+        // the indicators package's warm-up: KAMA forgets its seed at no less
+        // than (2/31)² a bar, so it gets more room than the flat 300
+        this.indicator = new KAMA(indicatorConfig.interval)
+        this.length = indicatorConfig.interval + 1000
+      }
+      if (indicatorConfig.maType === MAEnum.alma) {
+        this.indicator = new ALMA(indicatorConfig.interval)
+        this.length = indicatorConfig.interval + 300
+      }
+      if (indicatorConfig.maType === MAEnum.lsma) {
+        this.indicator = new LSMA(indicatorConfig.interval)
+        this.length = indicatorConfig.interval + 300
+      }
       // Trend filter: the MA against itself `trendFilterLookback` bars back.
       // The wrapper reports the plain MA bit for bit as `value`; without the
       // filter the plain MA and its warm-up stay exactly as they were.
@@ -686,6 +720,38 @@ export default class InternalIndicator {
       // the indicators package's warm-up: 2 × max(length, kcLength)
       this.length = squeezeWarmup(sqz.length, sqz.kcLength)
     }
+    // OBV / CMF / CHOP: settings resolved as the indicators package's factory
+    // does — present but unusable builds no indicator (never a silent
+    // default), and the default's warm-up stands in, as getWarmupCandles
+    if (indicatorConfig.type === IndicatorEnum.obv) {
+      const obv = resolveOBVSettings(
+        indicatorConfig.obvMaType,
+        indicatorConfig.obvMaLength,
+      )
+      if (obv) {
+        this.indicator = new OBV(obv.maType, obv.maLength)
+      }
+      const warm = obv ?? {
+        maType: OBV_DEFAULT_MA_TYPE,
+        maLength: OBV_DEFAULT_MA_LENGTH,
+      }
+      this.length = obvWarmup(warm.maType, warm.maLength) + add
+    }
+    if (indicatorConfig.type === IndicatorEnum.cmf) {
+      const n = resolveCMFLength(indicatorConfig.cmfLength)
+      if (n !== null) {
+        this.indicator = new CMF(n)
+      }
+      this.length = (n ?? CMF_DEFAULT_LENGTH) + add
+    }
+    if (indicatorConfig.type === IndicatorEnum.chop) {
+      const n = resolveChopLength(indicatorConfig.chopLength)
+      if (n !== null) {
+        this.indicator = new CHOP(n)
+      }
+      // first value on candle n + 1 (every true range has a previous close)
+      this.length = (n ?? CHOP_DEFAULT_LENGTH) + 1 + add
+    }
     if (smoothingConfig && this.indicator) {
       this.indicator = new SmoothedIndicator(
         this.indicator as ConstructorParameters<typeof SmoothedIndicator>[0],
@@ -730,6 +796,9 @@ export default class InternalIndicator {
         kind instanceof TEMA ||
         kind instanceof RMA ||
         kind instanceof McGinley ||
+        kind instanceof KAMA ||
+        kind instanceof ALMA ||
+        kind instanceof LSMA ||
         kind instanceof SMA ||
         kind instanceof WMA ||
         kind instanceof HMA)
@@ -753,7 +822,8 @@ export default class InternalIndicator {
         kind instanceof PriorPivot ||
         kind instanceof ATH ||
         kind instanceof KDJ ||
-        kind instanceof Squeeze)
+        kind instanceof Squeeze ||
+        kind instanceof CHOP)
     ) {
       target.next({
         high: +value.h,
@@ -775,7 +845,9 @@ export default class InternalIndicator {
         kind instanceof BollingerBands ||
         kind instanceof DIV ||
         kind instanceof PC ||
-        kind instanceof MATrendFilter)
+        kind instanceof MATrendFilter ||
+        kind instanceof OBV ||
+        kind instanceof CMF)
     ) {
       target.next({
         high: +value.h,
