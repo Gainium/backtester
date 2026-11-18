@@ -5,6 +5,12 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.31.2] - 2026-11-18
+
+### Fixed
+
+- Unrealized PnL of deals open at the end of a backtest is converted to USD at the last bar's price instead of the current market price
+
 ## [1.31.1] - 2026-11-16
 
 ### Fixed
