@@ -6451,10 +6451,21 @@ export abstract class Strategy implements StrategyInterface {
     }
   }
 
-  private getRate() {
-    const usdRateQuote = this.usdRateQuote.values().next().value ?? 1
-    const usdRateBase = this.usdRateBase.values().next().value ?? 1
-    const usdRate = this.usdRate.values().next().value ?? 1
+  /**
+   * USD rate of the currency usage is measured in. With `at`, the rate at that
+   * symbol's price (e.g. the last bar of the test) instead of the host's live
+   * price list.
+   */
+  private getRate(at?: { symbol: string; price: number }) {
+    const usdRateQuote = at
+      ? this.getUsdRate(at.symbol, at.price, 'quote')
+      : (this.usdRateQuote.values().next().value ?? 1)
+    const usdRateBase = at
+      ? this.getUsdRate(at.symbol, at.price, 'base')
+      : (this.usdRateBase.values().next().value ?? 1)
+    const usdRate = at
+      ? this.getUsdRate(at.symbol, at.price)
+      : (this.usdRate.values().next().value ?? 1)
     return this.futures
       ? usdRate
       : this.long
@@ -7002,7 +7013,10 @@ export abstract class Strategy implements StrategyInterface {
                 (this.long ? 1 : -1)) -
             commission
 
-          const usdRateCurrent = this.usdRate.get(od.symbol.pair) ?? 1
+          // Convert at the last bar's price, the same price the deal is valued
+          // at — not the host's live price list, which is today's price.
+          const markAt = { symbol: od.symbol.pair, price: markPrice }
+          const usdRateCurrent = this.getUsdRate(markAt.symbol, markAt.price)
           unrealizedPnL += unPnl
           unrealizedPnLUsd += unPnl * usdRateCurrent
           const dealUsage =
@@ -7026,7 +7040,7 @@ export abstract class Strategy implements StrategyInterface {
                   : od.usage.current
                       .base) /* * (this.profitBase ? 1 : tpPrice) */ /
               this.leverage) *
-            this.getRate()
+            this.getRate(markAt)
           unrealizedUsage += dealUsage
           unrealizedByDeal.set(od.id, {
             total: this.math.round(
