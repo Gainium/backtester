@@ -59,6 +59,7 @@ class DCABacktesting extends Backtesting {
     useFile,
     fullResult,
     hooks,
+    enforceBalances,
     ...rest
   }: DCABacktestingInput) {
     // 1.12.0 — a single-position bot runs without safety orders (spec 139
@@ -107,6 +108,7 @@ class DCABacktesting extends Backtesting {
           exchange: this.exchange,
           // 1.8.0 — undefined unless a host passes hooks
           hooks,
+          enforceBalances,
         },
         this.fileName,
         ...strategy,

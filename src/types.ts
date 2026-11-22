@@ -1829,6 +1829,15 @@ export type DCABacktestingInput = BacktestingInput<DCABotSettings> & {
    * every dashboard — the engine runs exactly as before.
    */
   hooks?: DCABacktestHooks
+  /**
+   * budget cap: treat `balances` as the bot's real budget. A base order
+   * or a DCA order that the free amount of the asset it spends cannot pay for
+   * is skipped, as the live bot's balance check does, and the profit % is
+   * measured against that budget. Free = the passed `free` amount + profit
+   * kept in that asset - what open deals hold. Spot DCA bots only (combo and
+   * futures ignore it). Absent or false: the engine runs exactly as before.
+   */
+  enforceBalances?: boolean
 }
 
 /** A deal the start condition is about to open (all engine gates passed). */
@@ -2143,6 +2152,18 @@ export type DCABacktestingResult = {
   periodicStats?: PeriodicStats[]
   dealStats?: DealStats
   messages?: string[]
+  /**
+   * budget cap — present only when `enforceBalances` applied a budget.
+   * `dcaRefused` counts distinct DCA orders (deal + level);
+   * `dcaRefusedAttempts` counts every refusal, retries included.
+   */
+  budgetLimit?: {
+    asset: string
+    budget: number
+    dealsSkipped: number
+    dcaRefused: number
+    dcaRefusedAttempts: number
+  }
 }
 
 export enum FuturesStrategyEnum {

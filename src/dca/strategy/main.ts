@@ -197,6 +197,8 @@ export type StrategyInput = {
   exchange: ExchangeEnum
   /** 1.8.0 — optional host hooks; inert when absent */
   hooks?: DCABacktestHooks
+  /** budget cap — see DCABacktestingInput.enforceBalances */
+  enforceBalances?: boolean
 }
 
 export type DataType = {
@@ -529,6 +531,9 @@ export abstract class Strategy implements StrategyInterface {
 
   private readonly balances?: Asset[] | null
 
+  /** budget cap: `balances` is a hard budget */
+  private readonly enforceBalances: boolean = false
+
   private gridsOnPrice: Map<string, DCAGrid[]> = new Map()
 
   private pricesCache: Map<
@@ -793,6 +798,10 @@ export abstract class Strategy implements StrategyInterface {
   }
 
   // ─── host hooks (1.8.0) — inert unless `hooks` is set ──────────────────────
+
+  static get budgetSkipped() {
+    return StrategyContextManager.getActiveContext().budgetSkipped
+  }
 
   static get hooks(): DCABacktestHooks | undefined {
     return StrategyContextManager.getActiveContext().hooks
@@ -1173,6 +1182,7 @@ export abstract class Strategy implements StrategyInterface {
     this.prices = prices
     Strategy.interval = interval
     this.balances = balances
+    this.enforceBalances = !!input.enforceBalances
     this.slippage = slippage
   }
 
@@ -2389,6 +2399,57 @@ export abstract class Strategy implements StrategyInterface {
     return []
   }
 
+  /**
+   * budget cap: the budget row (asset and passed amount) a new order of
+   * this bot spends from, or null when no budget applies.
+   */
+  private budgetRow(s: string): { asset: string; amount: number } | null {
+    if (!this.enforceBalances || Strategy.combo || this.futures) {
+      return null
+    }
+    const symbol = this.symbols.get(s)
+    if (!symbol) {
+      return null
+    }
+    // spot: a long buys with quote, a short sells base
+    const asset = this.long ? symbol.quoteAsset.name : symbol.baseAsset.name
+    const row = (this.balances ?? []).find((b) => b.asset === asset)
+    if (!row) {
+      return null
+    }
+    return { asset, amount: +(row.free ?? '0') }
+  }
+
+  /**
+   * budget cap: free budget = passed amount + profit kept in that
+   * asset - what every open deal spending the same asset holds.
+   */
+  private budgetFree(s: string): number | null {
+    const row = this.budgetRow(s)
+    if (!row) {
+      return null
+    }
+    const profitInAsset = this.long ? !this.profitBase : this.profitBase
+    let held = 0
+    for (const d of Strategy.getDeals('open')) {
+      const spends = this.long
+        ? d.symbol.quoteAsset.name
+        : d.symbol.baseAsset.name
+      if (spends !== row.asset) {
+        continue
+      }
+      const u = this.getUsage(d).current
+      held += this.long ? u.quote : u.base
+    }
+    return row.amount + (profitInAsset ? Strategy.totalProfit : 0) - held
+  }
+
+  /** budget cap: what an order takes from the budget */
+  private budgetNeed(o: DCAGrid) {
+    // a long pays price * qty plus the fee in quote, a short sells qty base
+    return this.long ? o.qty * o.price * (1 + this.userFee) : o.qty
+  }
+
   private getBalances(s: string): Asset[] | null | undefined {
     const symbol = this.symbols.get(s)
     if (!symbol) {
@@ -2703,6 +2764,8 @@ export abstract class Strategy implements StrategyInterface {
       sizeMultiplier = this.applicableSizeMultiplier(answer.m)
       sizeScope = answer.scope
     }
+    const prevLastOpened = Strategy.lastOpenedDeal
+    const prevLastOpenedSymbol = Strategy.lastOpenedDealPerSymbol.get(s)
     if (!onlyReturn) {
       Strategy.lastOpenedDeal = startTime
       Strategy.lastOpenedDealPerSymbol.set(s, startTime)
@@ -2817,6 +2880,19 @@ export abstract class Strategy implements StrategyInterface {
     const baseOrder = filledOrders[0]
     if (!baseOrder) {
       return
+    }
+    const budget = onlyReturn ? null : this.budgetFree(s)
+    if (budget !== null && this.budgetNeed(baseOrder) > budget + 1e-12) {
+      // budget cap: no money, no deal. The open never happened, so the
+      // cooldown clocks set above go back to what they were.
+      Strategy.budgetSkipped.deals += 1
+      Strategy.lastOpenedDeal = prevLastOpened
+      if (prevLastOpenedSymbol === undefined) {
+        Strategy.lastOpenedDealPerSymbol.delete(s)
+      } else {
+        Strategy.lastOpenedDealPerSymbol.set(s, prevLastOpenedSymbol)
+      }
+      return cbIfNotOpened && cbIfNotOpened()
     }
     if (!onlyReturn) {
       this.updatePositionWithOrder(baseOrder, s)
@@ -3116,6 +3192,15 @@ export abstract class Strategy implements StrategyInterface {
         // 1.12.0 (spec 139 §2.2): a position is funded for its entry limit
         balance *= this.positionBudgetEntries
         balanceForProfit *= this.positionBudgetEntries
+      }
+      const budgetRow = this.budgetRow(s)
+      if (budgetRow) {
+        // budget cap: the bot is funded with the budget, not with
+        // what its deal limit could use
+        balance = budgetRow.amount
+        balanceForProfit = this.long
+          ? budgetRow.amount * (this.profitBase ? 1 / deal.startPrice : 1)
+          : budgetRow.amount * (this.profitBase ? 1 : deal.startPrice)
       }
 
       Strategy.balance.set(key, balance)
@@ -4353,13 +4438,42 @@ export abstract class Strategy implements StrategyInterface {
   }
 
   private async processDCAOrders(d: Deal, b: FullBar) {
-    const filledDCA = d.activeOrders
+    let filledDCA = d.activeOrders
       .filter(
         (o) =>
           o.type === DCAOrderTypeEnum.dca || o.type === DCAOrderTypeEnum.bo,
       )
       .filter(this.filterFn.filledOrders(b))
       .map((o) => ({ ...o, filledTime: b.time }))
+    const budget = filledDCA.length > 0 ? this.budgetFree(d.symbol.pair) : null
+    if (budget !== null) {
+      // budget cap: in fill order, each DCA order must fit what the
+      // orders before it left. A refused order is dropped (live, the
+      // exchange rejects it), so it cannot fill later at another price.
+      const ordered = [...filledDCA].sort((a, B) =>
+        this.long ? B.price - a.price : a.price - B.price,
+      )
+      let left = budget
+      const refused = new Set<string>()
+      const kept: typeof filledDCA = []
+      for (const o of ordered) {
+        const need = o.type === DCAOrderTypeEnum.dca ? this.budgetNeed(o) : 0
+        if (need <= left + 1e-12) {
+          left -= need
+          kept.push(o)
+        } else {
+          Strategy.budgetSkipped.dca += 1
+          Strategy.budgetSkipped.dcaOrders.add(
+            `${d.id}:${o.levelNumber ?? d.lastFilled}`,
+          )
+          refused.add(o.id)
+        }
+      }
+      if (refused.size) {
+        d.activeOrders = d.activeOrders.filter((o) => !refused.has(o.id))
+      }
+      filledDCA = kept
+    }
     if (filledDCA.length > 0) {
       for (const o of filledDCA.sort((a, B) =>
         this.long ? B.price - a.price : a.price - B.price,
@@ -7167,12 +7281,18 @@ export abstract class Strategy implements StrategyInterface {
       Math.max(maxTheoreticalUsage, maxDealUsage, maxBotUsage),
       precision,
     )
-    const maxTheoreticalUsageWithRate = [
-      OrderSizeTypeEnum.percFree,
-      OrderSizeTypeEnum.percTotal,
-    ].includes(this.settings.orderSizeType)
-      ? Strategy.initialBalanceUsd
-      : maxTheoreticalUsageValue * this.getRate()
+    // budget cap: with a hard budget the capital is that budget, the
+    // same as for order sizes taken from the balance
+    const budgeted = [...this.symbols.keys()].some(
+      (s) => this.budgetRow(s) !== null,
+    )
+    const maxTheoreticalUsageWithRate =
+      budgeted ||
+      [OrderSizeTypeEnum.percFree, OrderSizeTypeEnum.percTotal].includes(
+        this.settings.orderSizeType,
+      )
+        ? Strategy.initialBalanceUsd
+        : maxTheoreticalUsageValue * this.getRate()
     // 1.28.0: the run starts from the whole budget, not from
     // `initialBalanceUsd` (the first deal's pair budget only), and the headline
     // drawdown / run-up are % of that fixed budget — the base of
@@ -7477,8 +7597,29 @@ export abstract class Strategy implements StrategyInterface {
         annualizedReturn = this.math.round(annualizedReturn, 2)
       }
     }
+    const skipped = Strategy.budgetSkipped
+    if (skipped.deals || skipped.dca) {
+      Strategy.messages.push(
+        `Budget limit: refused for lack of funds ${skipped.deals} deal start attempt(s) and ${skipped.dca} DCA order attempt(s) (${skipped.dcaOrders.size} distinct DCA order(s), deal + level).`,
+      )
+    }
+    let budgetLimit: DCABacktestingResult['budgetLimit']
+    for (const s of this.symbols.keys()) {
+      const row = this.budgetRow(s)
+      if (row) {
+        budgetLimit = {
+          asset: row.asset,
+          budget: row.amount,
+          dealsSkipped: skipped.deals,
+          dcaRefused: skipped.dcaOrders.size,
+          dcaRefusedAttempts: skipped.dca,
+        }
+        break
+      }
+    }
     const result: DCABacktestingResult = {
       messages: [...new Set(Strategy.messages)],
+      ...(budgetLimit ? { budgetLimit } : {}),
       portfolio: Array.from(Strategy.portfolio, (v) => ({
         x: v[0],
         y: this.math.round(v[1] + equityShift),

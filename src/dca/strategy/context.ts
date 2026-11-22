@@ -50,6 +50,9 @@ export class StrategyContext {
   // State management
   public status: 'open' | 'closed' | 'monitoring' = 'open'
   public messages: string[] = []
+  /** budget cap: refused attempts, and the distinct DCA orders (deal + level)
+   * behind them; a waiting deal retries the same order at every new signal */
+  public budgetSkipped = { deals: 0, dca: 0, dcaOrders: new Set<string>() }
   public workingShift: { start: number; end?: number }[] = []
 
   // Data storage
@@ -187,6 +190,7 @@ export class StrategyContext {
     this.indicatorEvents = []
     this.workingShift = []
     this.messages = []
+    this.budgetSkipped = { deals: 0, dca: 0, dcaOrders: new Set<string>() }
     this.dealsBySymbolsStatusId.clear()
     this.profits = []
     this.rangeStatus = false
