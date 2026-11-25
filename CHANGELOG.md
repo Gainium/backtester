@@ -5,6 +5,12 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.32.1] - 2026-11-25
+
+### Fixed
+
+- On pairs not quoted in USDT (for example BTC/USDC), base-currency profit in a DCA, combo or grid backtest is converted to USD at the pair's own price in the test instead of the current BASE/USDT market price
+
 ## [1.32.0] - 2026-11-22
 
 ### Added
