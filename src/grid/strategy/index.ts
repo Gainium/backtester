@@ -233,12 +233,20 @@ export class Strategy implements StrategyInterface {
     this.data = data
     const lastRate = this.data[this.data.length - 1]?.close ?? 0
     if (lastRate) {
-      this.usdRate = findUSDRate(
-        this.profitBase
-          ? this.symbol.baseAsset.name
-          : this.symbol.quoteAsset.name,
-        this.updatePriceWithOldPrice(lastRate),
-      )
+      // findUSDRate tries BASE/USDT before BASE/<quote>, so off a USDT quote
+      // it would take the live BASE/USDT price over this pair's last bar. The
+      // quote's rate is read without this pair, which would otherwise cross a
+      // quote that has no USDT pair back to the live BASE/USDT price.
+      this.usdRate =
+        this.profitBase && this.symbol.quoteAsset.name !== 'USDT'
+          ? lastRate *
+            findUSDRate(this.symbol.quoteAsset.name, this.pricesWOutSymbols)
+          : findUSDRate(
+              this.profitBase
+                ? this.symbol.baseAsset.name
+                : this.symbol.quoteAsset.name,
+              this.updatePriceWithOldPrice(lastRate),
+            )
       this.usdRateQuote = this.profitBase
         ? findUSDRate(
             this.symbol.quoteAsset.name,

@@ -3393,16 +3393,19 @@ export abstract class Strategy implements StrategyInterface {
     if (!s) {
       return 1
     }
-    return findUSDRate(
-      type === 'base'
-        ? s.baseAsset.name
-        : type === 'quote'
-          ? s.quoteAsset.name
-          : this.profitBase
-            ? s.baseAsset.name
-            : s.quoteAsset.name,
-      [{ symbol, price }, ...this.prices.filter((p) => p.symbol !== symbol)],
-    )
+    const others = this.prices.filter((p) => p.symbol !== symbol)
+    const base = type === 'base' || (type === undefined && this.profitBase)
+    // findUSDRate tries BASE/USDT before BASE/<quote>, so off a USDT quote it
+    // would take the live BASE/USDT price over this pair's own price at the
+    // bar. The quote's rate is read without this pair: with it, a quote that
+    // has no USDT pair is crossed through it back to the live BASE/USDT price.
+    if (base && s.quoteAsset.name !== 'USDT') {
+      return price * findUSDRate(s.quoteAsset.name, others)
+    }
+    return findUSDRate(base ? s.baseAsset.name : s.quoteAsset.name, [
+      { symbol, price },
+      ...others,
+    ])
   }
 
   private updateDealVolume(deal: Deal /* , bar: FullBar */) {
