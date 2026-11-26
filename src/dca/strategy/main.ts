@@ -3,6 +3,7 @@ import { groupStandsAlone } from './ti/groupLogic'
 import { v4 } from 'uuid'
 import { StrategyContextManager } from './context'
 import { checkNumber } from '../../helper/utils'
+import * as calendar from '../../helper/calendar'
 import {
   closedOutcomesNewestFirst,
   hasConsecutiveStreak,
@@ -533,6 +534,12 @@ export abstract class Strategy implements StrategyInterface {
 
   /** budget cap: `balances` is a hard budget */
   private readonly enforceBalances: boolean = false
+
+  /**
+   * The zone the day / month / year stats are bucketed in: the input's
+   * `timezone`, or UTC — never the zone of the machine running the backtest.
+   */
+  private readonly calendarZone: string = 'UTC'
 
   private gridsOnPrice: Map<string, DCAGrid[]> = new Map()
 
@@ -1183,6 +1190,7 @@ export abstract class Strategy implements StrategyInterface {
     Strategy.interval = interval
     this.balances = balances
     this.enforceBalances = !!input.enforceBalances
+    this.calendarZone = calendar.calendarZone(input.timezone)
     this.slippage = slippage
   }
 
@@ -6743,15 +6751,15 @@ export abstract class Strategy implements StrategyInterface {
     if (!first) {
       return 0
     }
-    const startDate = new Date(first.startTime)
-    startDate.setHours(0, 0, 0, 0)
+    const zone = this.calendarZone
+    let dayStart = calendar.startOfDay(first.startTime, zone)
     const x: number[] = []
     const y: number[] = []
     let cwr = 0
     for (
-      let i = startDate.getTime(), prev = 0, day = 1;
+      let i = dayStart, prev = 0, day = 1;
       prev <= (lastDataItem?.time ?? -1);
-      i = startDate.getTime(), day++
+      i = dayStart, day++
     ) {
       const _deals = Strategy.getDeals('closed').filter(
         (d) => d.closedTime && d.closedTime >= prev && d.closedTime < i,
@@ -6778,7 +6786,7 @@ export abstract class Strategy implements StrategyInterface {
       x.push(day)
       y.push((y[y.length - 1] ?? 0) + (usage === 0 ? 0 : profit / usage))
 
-      startDate.setHours(24)
+      dayStart = calendar.nextDay(dayStart, zone)
 
       prev = i
     }
@@ -7252,17 +7260,17 @@ export abstract class Strategy implements StrategyInterface {
     if (workingDays > 3 && closedDeals.length > 0) {
       const dealsByStart = closedDeals.sort((a, b) => a.startTime - b.startTime)
       const [first] = dealsByStart
-      const startDate = new Date(first.startTime)
-      startDate.setHours(0, 0, 0, 0)
+      const zone = this.calendarZone
+      let periodStart = calendar.startOfDay(first.startTime, zone)
       periodRatio = 365
       if (workingDays - 90 > 0) {
-        startDate.setDate(1)
+        periodStart = calendar.startOfMonth(first.startTime, zone)
         periodRatio = 12
       }
       for (
-        let i = startDate.getTime(), prev = 0;
+        let i = periodStart, prev = 0;
         prev <= (lastDataItem?.time ?? -1);
-        i = startDate.getTime()
+        i = periodStart
       ) {
         const deals = allDeals.filter(
           (d) => d.closedTime && d.closedTime >= prev && d.closedTime < i,
@@ -7271,10 +7279,10 @@ export abstract class Strategy implements StrategyInterface {
         const profit = deals.reduce((acc, v) => (acc += v.profit.total), 0)
         profitByPeriod.push(profit)
         if (periodRatio === 365) {
-          startDate.setHours(24)
+          periodStart = calendar.nextDay(periodStart, zone)
         }
         if (periodRatio === 12) {
-          startDate.setMonth(startDate.getMonth() + 1)
+          periodStart = calendar.nextMonth(periodStart, zone)
         }
         prev = i
       }
@@ -7445,12 +7453,8 @@ export abstract class Strategy implements StrategyInterface {
       // overshooting its bound by one period).
       let i = firstDataTime
       while (i < lastDataTime) {
-        const monthlyStart = new Date(i)
-        monthlyStart.setDate(1)
-        monthlyStart.setHours(0, 0, 0, 0)
-        const nextMonth = new Date(monthlyStart)
-        nextMonth.setDate(1)
-        nextMonth.setMonth(nextMonth.getMonth() + 1)
+        const monthlyStart = calendar.startOfMonth(i, this.calendarZone)
+        const nextMonth = calendar.nextMonth(monthlyStart, this.calendarZone)
         // `nextMonth` is always > `i` (i lies inside [monthlyStart, nextMonth)),
         // so the loop always advances.
         i = +nextMonth
@@ -7490,10 +7494,7 @@ export abstract class Strategy implements StrategyInterface {
         i < lastDataTime + 365 * 24 * 60 * 60 * 1000;
         i += 365 * 24 * 60 * 60 * 1000
       ) {
-        const yearStart = new Date(i)
-        yearStart.setDate(1)
-        yearStart.setHours(0, 0, 0, 0)
-        yearStart.setMonth(0)
+        const yearStart = calendar.startOfYear(i, this.calendarZone)
         const findYear = periodicStats.find(
           (p) => p.startTime === +yearStart && p.period === 'year',
         )
@@ -7506,8 +7507,7 @@ export abstract class Strategy implements StrategyInterface {
         ) {
           continue
         }
-        const nextYear = new Date(yearStart)
-        nextYear.setFullYear(nextYear.getFullYear() + 1)
+        const nextYear = calendar.nextYear(yearStart, this.calendarZone)
         const yearlyDeals = allDeals.filter(
           (d) =>
             d.closedTime &&

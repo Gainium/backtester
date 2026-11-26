@@ -1931,6 +1931,12 @@ export type BacktestingInput<T> = {
   combo?: boolean
   trades?: boolean
   multi?: boolean
+  /**
+   * IANA zone the day / month / year stats (CWR, Sharpe, Sortino, profit by
+   * period, periodic stats) are bucketed in. Missing or invalid = UTC; the
+   * zone of the machine running the backtest is never used, so a server and
+   * a browser given the same input report the same stats.
+   */
   timezone?: string | null
   fullResult?: boolean
   useFile?: boolean

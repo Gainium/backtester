@@ -11,6 +11,7 @@ import {
 } from '../../types'
 import { friendlyTime } from '../../helper/timeFunctions'
 import { MathHelper } from '../../helper/math'
+import * as calendar from '../../helper/calendar'
 import findUSDRate from '../../helper/price'
 
 import type {
@@ -40,6 +41,8 @@ export type GRIDStrategyInput = {
   interval?: ExchangeIntervals
   trades?: boolean
   fullResult?: boolean
+  /** the zone day / month stats are bucketed in; missing or invalid = UTC */
+  timezone?: string | null
 }
 
 export interface StrategyInterface {
@@ -193,10 +196,14 @@ export class Strategy implements StrategyInterface {
 
   private fullResult?: boolean
 
+  /** see GRIDStrategyInput.timezone — never the host machine's zone */
+  private calendarZone: string
+
   constructor(input: GRIDStrategyInput) {
     const { settings, userFee, symbol, prices, interval, trades, fullResult } =
       input
     this.fullResult = fullResult
+    this.calendarZone = calendar.calendarZone(input.timezone)
     this.settings = settings
     this.botFunctions = new BotFunctions(
       settings,
@@ -1554,17 +1561,17 @@ export class Strategy implements StrategyInterface {
         (a, b) => a.updateTime - b.updateTime,
       )
       const [first] = transactionsSort
-      const startDate = new Date(first.updateTime)
-      startDate.setHours(0, 0, 0, 0)
+      const zone = this.calendarZone
+      let periodStart = calendar.startOfDay(first.updateTime, zone)
       periodRatio = 365
       if (workingDays - 90 > 0) {
-        startDate.setDate(1)
+        periodStart = calendar.startOfMonth(first.updateTime, zone)
         periodRatio = 12
       }
       for (
-        let i = startDate.getTime(), prev = 0;
+        let i = periodStart, prev = 0;
         prev <= (lastData?.time || -1);
-        i = startDate.getTime()
+        i = periodStart
       ) {
         const transactionByPeriod = this.transactions.filter(
           (d) => d.updateTime && d.updateTime >= prev && d.updateTime < i,
@@ -1576,10 +1583,10 @@ export class Strategy implements StrategyInterface {
         )
         profitByPeriod.push(profit)
         if (periodRatio === 365) {
-          startDate.setHours(24)
+          periodStart = calendar.nextDay(periodStart, zone)
         }
         if (periodRatio === 12) {
-          startDate.setMonth(startDate.getMonth() + 1)
+          periodStart = calendar.nextMonth(periodStart, zone)
         }
         prev = i
       }

@@ -17,6 +17,7 @@ class DCABacktesting extends Backtesting {
     interval,
     trades,
     fullResult,
+    timezone,
     ...rest
   }: GRIDBacktestingInput) {
     const candleInterval = interval ?? ExchangeIntervals.fiveM
@@ -29,6 +30,7 @@ class DCABacktesting extends Backtesting {
         prices,
         settings,
         trades,
+        timezone,
         fullResult,
       },
       '',
@@ -41,6 +43,7 @@ class DCABacktesting extends Backtesting {
       interval,
       trades,
       fullResult,
+      timezone,
     })
   }
 
