@@ -5,6 +5,12 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.32.3] - 2026-11-26
+
+### Fixed
+
+- Test suite: golden results are the same on every machine. Mocha runs in UTC (the DCA stats bucket days at local midnight, so goldens cut in one zone failed in another), and the golden candle generators use a sine rounded to 1e-9 (V8's Math.sin differs in the last bit between x64 and arm64). Goldens regenerated; only their sha256 changes, deal counts, profit and drawdown are identical. No engine or result change
+
 ## [1.32.2] - 2026-11-26
 
 ### Added
