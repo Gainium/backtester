@@ -5,6 +5,12 @@ All notable changes to the Gainium Backtester library will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.32.4] - 2026-11-26
+
+### Fixed
+
+- Backtest day, month and year stats (CWR, Sharpe, Sortino, profit by period, periodic stats) are bucketed in the backtest's timezone input, or UTC when none is given, instead of the zone of the machine running the backtest. The same backtest now reports the same stats on a server and in a browser. A browser that passes its own zone sees no change. Applies to DCA, combo, hedge and grid
+
 ## [1.32.3] - 2026-11-26
 
 ### Fixed

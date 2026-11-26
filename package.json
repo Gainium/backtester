@@ -1,6 +1,6 @@
 {
   "name": "@gainium/backtester",
-  "version": "1.32.3",
+  "version": "1.32.4",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
