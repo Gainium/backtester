@@ -30,6 +30,7 @@ import {
   path,
   run,
 } from './helpers/singlePositionHarness'
+import { sin } from './helpers/stableMath'
 
 /**
  * Oscillator smoothing (smoothing / smoothingLength / smoothingCompare) on
@@ -50,8 +51,7 @@ type Extra = Record<string, unknown>
 
 /** Price wave with a varying volume, so VO and MFI move too. */
 const bars: FullBar[] = Array.from({ length: 700 }, (_, i) => {
-  const p = (k: number) =>
-    100 + 12 * Math.sin(k / 23) + 4 * Math.sin(k / 5) + k * 0.01
+  const p = (k: number) => 100 + 12 * sin(k / 23) + 4 * sin(k / 5) + k * 0.01
   const open = p(i - 1)
   const close = p(i)
   return {
@@ -60,7 +60,7 @@ const bars: FullBar[] = Array.from({ length: 700 }, (_, i) => {
     close,
     high: Math.max(open, close) + 0.6,
     low: Math.min(open, close) - 0.6,
-    volume: 1000 + 400 * Math.sin(i / 7) + 250 * Math.sin(i / 3),
+    volume: 1000 + 400 * sin(i / 7) + 250 * sin(i / 3),
     symbol: one.pair,
   }
 })

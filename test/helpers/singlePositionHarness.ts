@@ -23,6 +23,7 @@ import type {
   IndicatorStartConditionEnum,
   Symbols,
 } from '../../src/types'
+import { sin } from './stableMath'
 
 /** Shared fixtures for the single-position specs. */
 
@@ -49,10 +50,7 @@ export const wave = (
 ): FullBar[] =>
   Array.from({ length: n }, (_, i) => {
     const p = (k: number) =>
-      base +
-      12 * Math.sin((k + phase) / 23) +
-      4 * Math.sin((k + phase) / 5) +
-      k * 0.01
+      base + 12 * sin((k + phase) / 23) + 4 * sin((k + phase) / 5) + k * 0.01
     const open = p(i - 1)
     const close = p(i)
     return {

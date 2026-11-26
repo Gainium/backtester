@@ -28,6 +28,7 @@ import type {
   FullBar,
   Symbols,
 } from '../src/types'
+import { sin } from './helpers/stableMath'
 
 /**
  * Parity guard for the optional engine hooks (1.8.0).
@@ -63,10 +64,7 @@ const mkSymbol = (pair: string, base: string): Symbols => ({
 const wave = (pair: string, n: number, phase = 0, base = 100): FullBar[] =>
   Array.from({ length: n }, (_, i) => {
     const p = (k: number) =>
-      base +
-      12 * Math.sin((k + phase) / 23) +
-      4 * Math.sin((k + phase) / 5) +
-      k * 0.01
+      base + 12 * sin((k + phase) / 23) + 4 * sin((k + phase) / 5) + k * 0.01
     const open = p(i - 1)
     const close = p(i)
     return {

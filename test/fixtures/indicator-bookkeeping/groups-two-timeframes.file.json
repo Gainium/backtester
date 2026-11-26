@@ -1,5 +1,5 @@
 {
-  "sha256": "d64b5ca7291eca901f85c59789fceec5c42411d95dfab1070bba848c0e2e9b10",
+  "sha256": "98f1e5ab80ebe3dbaae71083752294a20985a3777bdbda219d906cf95150933a",
   "deals": 88,
   "closed": 88,
   "netProfitTotal": -2107.9128,
@@ -7,6 +7,6 @@
   "indicatorsEvents": 3100,
   "fed": {
     "candles": 17100,
-    "sha256": "6ced461f969b774385433c58fb3b6115e1df81866fe159a99dfcd0da258488dd"
+    "sha256": "2bb86af7392ba72b5486d83ebf19655f4db6c30efc0639aa8fd2fb35f1751910"
   }
 }

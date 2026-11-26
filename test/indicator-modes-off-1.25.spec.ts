@@ -17,6 +17,7 @@ import {
 import type { FullBar } from '../src/types'
 import { FROM, HOUR, fingerprint, one } from './helpers/singlePositionHarness'
 import { runEntry, startEntry } from './helpers/signalHarness'
+import { sin } from './helpers/stableMath'
 
 /**
  * 1.25.0 adds new settings to existing indicator types: the Divergence
@@ -47,7 +48,7 @@ for (let i = 1; i <= 1400; i++) {
   closes.push(
     closes[i - 1] +
       1.0 * rnd() +
-      0.03 * (100 + 7 * Math.sin(i / 31) - closes[i - 1]),
+      0.03 * (100 + 7 * sin(i / 31) - closes[i - 1]),
   )
 }
 const bars: FullBar[] = Array.from({ length: 1400 }, (_, i) => {
@@ -59,7 +60,7 @@ const bars: FullBar[] = Array.from({ length: 1400 }, (_, i) => {
     close,
     high: Math.max(open, close) + 0.3,
     low: Math.min(open, close) - 0.3,
-    volume: 1000 + 300 * Math.sin(i / 7),
+    volume: 1000 + 300 * sin(i / 7),
     symbol: one.pair,
   }
 })
