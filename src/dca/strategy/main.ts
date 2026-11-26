@@ -6850,6 +6850,7 @@ export abstract class Strategy implements StrategyInterface {
         price: o.price,
         side: o.side,
         id: o.id,
+        qty: o.qty,
         filledTime: o.filledTime,
         startTime: o.startTime,
         dealId: o.dealId,

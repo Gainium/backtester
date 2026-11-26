@@ -1745,6 +1745,8 @@ export type PreparedGrid = {
   // ties a grid order to its `mingrids[]` entry.
   type?: DCAOrderTypeEnum
   minigridId?: string
+  /** Filled base quantity, so charts can size a fill by its value. */
+  qty?: number
   /** 1.12.0 — a single-position entry after the base order */
   positionEntry?: boolean
 }
