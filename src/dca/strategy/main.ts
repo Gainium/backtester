@@ -2694,6 +2694,7 @@ export abstract class Strategy implements StrategyInterface {
     onlyReturn = false,
     cbIfNotOpened?: () => void,
   ) {
+    this.backfillUsdRates(s, price)
     if (!onlyReturn) {
       this.checkStartStopPrice(price, high, low)
     }
@@ -5821,6 +5822,7 @@ export abstract class Strategy implements StrategyInterface {
     }
     const fullSymbol = this.symbols.get(b.symbol)
     if (fullSymbol) {
+      this.backfillUsdRates(b.symbol, b.close)
       const k = this.futures
         ? this.coinm
           ? fullSymbol.baseAsset.name
@@ -6581,6 +6583,32 @@ export abstract class Strategy implements StrategyInterface {
    * symbol's price (e.g. the last bar of the test) instead of the host's live
    * price list.
    */
+  /**
+   * The host's live price list may not carry an asset (a tokenised stock
+   * such as RAAPL on Bitget). findUSDRate then returns 0, and on a short spot
+   * bot — budgeted in the base — every USD figure, the % base and the equity
+   * shift collapse to 0. A rate the list could not supply is taken from the
+   * pair's own price at its first bar; a rate the list did supply is kept.
+   */
+  private backfillUsdRates(symbol: string, price: number) {
+    if (!(price > 0)) {
+      return
+    }
+    const fill = (map: Map<string, number>, type?: 'base' | 'quote') => {
+      const cur = map.get(symbol)
+      if (cur !== undefined && cur > 0 && isFinite(cur)) {
+        return
+      }
+      const rate = this.getUsdRate(symbol, price, type)
+      if (rate > 0 && isFinite(rate)) {
+        map.set(symbol, rate)
+      }
+    }
+    fill(this.usdRate)
+    fill(this.usdRateBase, 'base')
+    fill(this.usdRateQuote, 'quote')
+  }
+
   private getRate(at?: { symbol: string; price: number }) {
     const usdRateQuote = at
       ? this.getUsdRate(at.symbol, at.price, 'quote')
@@ -6921,6 +6949,12 @@ export abstract class Strategy implements StrategyInterface {
     this.gridsOnPrice = new Map()
     this.pricesCache = new Map()
     const startResultProcessing = new Date().getTime()
+    // the result is built on this instance, which may never have seen a bar
+    // (per-symbol instances run them): backfill its rates from each pair's
+    // first bar, as the instance that opened the deals did
+    for (const [symbol, bar] of firstData) {
+      this.backfillUsdRates(symbol, bar.close)
+    }
     let allDeals = Strategy.getDeals()
     allDeals = allDeals.map((d) => {
       const symbol = this.symbols.get(d.symbol.pair)
@@ -7298,13 +7332,22 @@ export abstract class Strategy implements StrategyInterface {
     const budgeted = [...this.symbols.keys()].some(
       (s) => this.budgetRow(s) !== null,
     )
+    // the capital is valued at the run's first bar, as buy & hold is: off a
+    // live rate a short spot bot (capital in the base) was worth today's
+    // price at t0, a head start over buy & hold that never existed
+    const capitalSymbol = this.symbols.keys().next().value
+    const capitalBar = capitalSymbol ? firstData.get(capitalSymbol) : undefined
+    const capitalRateAt =
+      capitalSymbol && capitalBar && capitalBar.close > 0
+        ? { symbol: capitalSymbol, price: capitalBar.close }
+        : undefined
     const maxTheoreticalUsageWithRate =
       budgeted ||
       [OrderSizeTypeEnum.percFree, OrderSizeTypeEnum.percTotal].includes(
         this.settings.orderSizeType,
       )
         ? Strategy.initialBalanceUsd
-        : maxTheoreticalUsageValue * this.getRate()
+        : maxTheoreticalUsageValue * this.getRate(capitalRateAt)
     // 1.28.0: the run starts from the whole budget, not from
     // `initialBalanceUsd` (the first deal's pair budget only), and the headline
     // drawdown / run-up are % of that fixed budget — the base of
